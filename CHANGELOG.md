@@ -1,0 +1,24 @@
+# Changelog — Registro
+
+## v1.2.2
+- Icona dell'app sostituita con il tuo vero logo (Logo_Dark, dal progetto) al posto del segnaposto disegnato prima.
+
+## v1.2.1 — correzione
+- **Risolto: schermo bianco.** Mancava una libreria di supporto (`react-is`) richiesta da Recharts per disegnare i grafici; senza quella l'intera app si bloccava prima di mostrare qualsiasi cosa. Aggiunta allo script e alla cache offline.
+
+## v1.2.0
+- Nuova icona dell'app: moneta stilizzata con "R" e un rigo (richiama il registro contabile), negli stessi colori dell'app.
+- Guida di pubblicazione passata da Vercel a **GitHub Pages** (un account in meno, incorporato in GitHub).
+
+## v1.1.0
+- **Offline reale**: un service worker mette in cache l'app e le sue librerie al primo avvio online, così dopo si apre anche senza rete.
+- **Coda di sincronizzazione**: se un invio al foglio Google fallisce per mancanza di rete, resta in attesa e riparte da solo appena il dispositivo torna online (o al successivo avvio dell'app). Contatore visibile nella scheda Backup.
+- Numero di versione visibile in fondo all'app.
+
+## v1.0.0
+- Prima versione dell'app web indipendente (senza dipendenza da Claude), dati salvati nel browser del dispositivo.
+- Dashboard con andamento mensile, categorie principali, riepilogo mensile.
+- Budget mensili per categoria con avvisi automatici.
+- Backup su Google Sheets (invio automatico ad ogni transazione, tab per anno per restare leggero, caricamento/ripristino da foglio).
+- Chiusura automatica degli anni passati: totale per categoria conservato per sempre, transazioni di dettaglio eliminate.
+- Sezione Investimenti con percorso di studio, risorse personali e appunti.

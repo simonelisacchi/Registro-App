@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Registro — Money Tracker</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Registro" />
+<meta name="theme-color" content="#F7F5F1" />
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIj4KICA8ZGVmcz4KICAgIDwhLS0gU2ZvbmRvIERhcmsgcHJvZm9uZG8gLS0+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImRhcmstYmciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMTgxYTIyIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzBiMGMxMCIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwhLS0gQm9yZG8gbHVjZSBwZXJpbWV0cmFsZSAtLT4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iZGFyay1ib3JkZXIiIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMCUiIHkyPSIxMDAlIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIgc3RvcC1vcGFjaXR5PSIwLjE0Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIgc3RvcC1vcGFjaXR5PSIwLjAyIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KCiAgPCEtLSBCYXNlIFNxdWlyY2xlIC0tPgogIDxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjQ4MCIgaGVpZ2h0PSI0ODAiIHJ4PSIxMDgiIGZpbGw9InVybCgjZGFyay1iZykiLz4KICA8cmVjdCB4PSIxNiIgeT0iMTYiIHdpZHRoPSI0ODAiIGhlaWdodD0iNDgwIiByeD0iMTA4IiBmaWxsPSJub25lIiBzdHJva2U9InVybCgjZGFyay1ib3JkZXIpIiBzdHJva2Utd2lkdGg9IjIiLz4KCiAgPCEtLSBMZXR0ZXJhICdyJyAvIENvbG9ubmEgcmVnaXN0cm8gcHJpbmNpcGFsZSAtLT4KICA8cmVjdCB4PSIxMzYiIHk9IjE0OCIgd2lkdGg9IjQ0IiBoZWlnaHQ9IjIxNiIgcng9IjIyIiBmaWxsPSIjZjhmYWZjIi8+CgogIDwhLS0gVHJhdHRvIHN1cGVyaW9yZSBjdXJ2YXRvIC0tPgogIDxwYXRoIGQ9Ik0gMTU4IDE0OCBDIDIyMCAxNDgsIDI2MCAxODAsIDI2MCAyMzYgTCAyNjAgMjQ4IiAKICAgICAgICBmaWxsPSJub25lIiAKICAgICAgICBzdHJva2U9IiNmOGZhZmMiIAogICAgICAgIHN0cm9rZS13aWR0aD0iNDQiIAogICAgICAgIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgoKICA8IS0tIFJpZ2hlIGNvbnRhYmlsaSBzZWNvbmRhcmllIC0tPgogIDxyZWN0IHg9IjIzNiIgeT0iMjc4IiB3aWR0aD0iMTQwIiBoZWlnaHQ9IjE4IiByeD0iOSIgZmlsbD0iIzMzNDE1NSIvPgogIDxyZWN0IHg9IjIzNiIgeT0iMzIyIiB3aWR0aD0iOTAiIGhlaWdodD0iMTgiIHJ4PSI5IiBmaWxsPSIjMWUyOTNiIi8+CgogIDwhLS0gUHVudG8gZGkgYWNjZW50byAoQ2lhbm8gRWxldHRyaWNvKSAtLT4KICA8Y2lyY2xlIGN4PSIzNjYiIGN5PSIxNzAiIHI9IjE4IiBmaWxsPSIjMzhiZGY4Ii8+Cjwvc3ZnPgo=" />
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIj4KICA8ZGVmcz4KICAgIDwhLS0gU2ZvbmRvIERhcmsgcHJvZm9uZG8gLS0+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImRhcmstYmciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMTgxYTIyIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzBiMGMxMCIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwhLS0gQm9yZG8gbHVjZSBwZXJpbWV0cmFsZSAtLT4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iZGFyay1ib3JkZXIiIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMCUiIHkyPSIxMDAlIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIgc3RvcC1vcGFjaXR5PSIwLjE0Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIgc3RvcC1vcGFjaXR5PSIwLjAyIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KCiAgPCEtLSBCYXNlIFNxdWlyY2xlIC0tPgogIDxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjQ4MCIgaGVpZ2h0PSI0ODAiIHJ4PSIxMDgiIGZpbGw9InVybCgjZGFyay1iZykiLz4KICA8cmVjdCB4PSIxNiIgeT0iMTYiIHdpZHRoPSI0ODAiIGhlaWdodD0iNDgwIiByeD0iMTA4IiBmaWxsPSJub25lIiBzdHJva2U9InVybCgjZGFyay1ib3JkZXIpIiBzdHJva2Utd2lkdGg9IjIiLz4KCiAgPCEtLSBMZXR0ZXJhICdyJyAvIENvbG9ubmEgcmVnaXN0cm8gcHJpbmNpcGFsZSAtLT4KICA8cmVjdCB4PSIxMzYiIHk9IjE0OCIgd2lkdGg9IjQ0IiBoZWlnaHQ9IjIxNiIgcng9IjIyIiBmaWxsPSIjZjhmYWZjIi8+CgogIDwhLS0gVHJhdHRvIHN1cGVyaW9yZSBjdXJ2YXRvIC0tPgogIDxwYXRoIGQ9Ik0gMTU4IDE0OCBDIDIyMCAxNDgsIDI2MCAxODAsIDI2MCAyMzYgTCAyNjAgMjQ4IiAKICAgICAgICBmaWxsPSJub25lIiAKICAgICAgICBzdHJva2U9IiNmOGZhZmMiIAogICAgICAgIHN0cm9rZS13aWR0aD0iNDQiIAogICAgICAgIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgoKICA8IS0tIFJpZ2hlIGNvbnRhYmlsaSBzZWNvbmRhcmllIC0tPgogIDxyZWN0IHg9IjIzNiIgeT0iMjc4IiB3aWR0aD0iMTQwIiBoZWlnaHQ9IjE4IiByeD0iOSIgZmlsbD0iIzMzNDE1NSIvPgogIDxyZWN0IHg9IjIzNiIgeT0iMzIyIiB3aWR0aD0iOTAiIGhlaWdodD0iMTgiIHJ4PSI5IiBmaWxsPSIjMWUyOTNiIi8+CgogIDwhLS0gUHVudG8gZGkgYWNjZW50byAoQ2lhbm8gRWxldHRyaWNvKSAtLT4KICA8Y2lyY2xlIGN4PSIzNjYiIGN5PSIxNzAiIHI9IjE4IiBmaWxsPSIjMzhiZGY4Ii8+Cjwvc3ZnPgo=" />
+<link rel="manifest" href="./manifest.json" />
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/prop-types/prop-types.min.js"></script>
+<script src="https://unpkg.com/react-is@18/umd/react-is.production.min.js"></script>
+<script src="https://unpkg.com/recharts@2/umd/Recharts.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
+  }
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #F7F5F1; }
+  #root { min-height: 100vh; }
+  ::selection { background: #C99A3B55; }
+  input, select, textarea, button { font-family: 'Inter', sans-serif; }
+  input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid #C99A3B; outline-offset: 1px; }
+  @media (min-width: 640px) { .grid-2 { grid-template-columns: 1fr 1fr !important; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+
+const { useState, useEffect, useMemo } = React;
+const { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell } = Recharts;
+
+/* ---------- dati di partenza ---------- */
+
+const DEFAULT_CATEGORIES = [
+  { id: "trasporti", name: "Trasporti", icon: "🚌", color: "#C77D2E", type: "expense", budget: 0 },
+  { id: "benzina", name: "Benzina", icon: "⛽", color: "#B45309", type: "expense", budget: 0 },
+  { id: "macchina", name: "Macchina", icon: "🚗", color: "#78716C", type: "expense", budget: 0 },
+  { id: "pub", name: "Pub", icon: "🍺", color: "#C99A3B", type: "expense", budget: 0 },
+  { id: "bar", name: "Bar", icon: "☕", color: "#BE5A83", type: "expense", budget: 0 },
+  { id: "sport", name: "Sport", icon: "🏀", color: "#3B6FA8", type: "expense", budget: 0 },
+  { id: "cibo", name: "Cibo", icon: "🍔", color: "#8A4B2E", type: "expense", budget: 0 },
+  { id: "spesa", name: "Spesa", icon: "🛒", color: "#3F8B5C", type: "expense", budget: 0 },
+  { id: "salute", name: "Salute", icon: "❤️", color: "#B4472F", type: "expense", budget: 0 },
+  { id: "svago", name: "Svago", icon: "🎭", color: "#5B4FA0", type: "expense", budget: 0 },
+  { id: "shopping", name: "Shopping", icon: "🛍️", color: "#7C5CBF", type: "expense", budget: 0 },
+  { id: "telefono", name: "Telefono", icon: "📞", color: "#B4472F", type: "expense", budget: 0 },
+  { id: "uni", name: "Università", icon: "📝", color: "#6B6862", type: "expense", budget: 0 },
+  { id: "altro-e", name: "Altro", icon: "➕", color: "#8A8578", type: "expense", budget: 0 },
+  { id: "stipendio", name: "Stipendio", icon: "💼", color: "#2F6F5E", type: "income" },
+  { id: "regali", name: "Regali", icon: "🎁", color: "#BE5A83", type: "income" },
+  { id: "altro-i", name: "Altro", icon: "➕", color: "#2F6F5E", type: "income" },
+];
+
+const DEFAULT_TOPICS = [
+  { id: "i1", level: "Base", kind: "Concetto", title: "Interesse composto", note: "Il meccanismo per cui i guadagni generano altri guadagni nel tempo. È la base di ogni ragionamento sugli investimenti." },
+  { id: "i2", level: "Base", kind: "Concetto", title: "Fondo di emergenza", note: "Riserva liquida (3-6 mesi di spese) da avere da parte prima di iniziare a investire." },
+  { id: "i3", level: "Base", kind: "Concetto", title: "Inflazione e potere d'acquisto", note: "Perché tenere i soldi fermi sul conto corrente li fa perdere valore nel tempo." },
+  { id: "i4", level: "Base", kind: "Libro", title: "Il piccolo libro per investire con buon senso — J. Bogle", note: "Introduzione classica agli investimenti passivi e ai fondi indicizzati." },
+  { id: "i5", level: "Intermedio", kind: "Concetto", title: "ETF e fondi indicizzati", note: "Come funzionano gli strumenti che replicano un intero mercato invece di puntare su singoli titoli." },
+  { id: "i6", level: "Intermedio", kind: "Concetto", title: "Diversificazione e rischio", note: "Perché distribuire il capitale su più asset riduce il rischio complessivo del portafoglio." },
+  { id: "i7", level: "Intermedio", kind: "Concetto", title: "Orizzonte temporale e profilo di rischio", note: "Come il tempo a disposizione cambia le scelte di investimento sensate per una persona." },
+  { id: "i8", level: "Intermedio", kind: "Concetto", title: "PAC — Piano di Accumulo del Capitale", note: "Investire piccole somme con regolarità invece che in un'unica soluzione, per mediare il prezzo d'ingresso." },
+  { id: "i9", level: "Avanzato", kind: "Concetto", title: "Asset allocation e ribilanciamento", note: "Come mantenere nel tempo le proporzioni scelte tra azionario, obbligazionario e liquidità." },
+  { id: "i10", level: "Avanzato", kind: "Concetto", title: "Fiscalità degli investimenti in Italia", note: "Tassazione delle plusvalenze, regime dichiarativo vs amministrato, bollo titoli." },
+];
+
+const LEVELS = ["Base", "Intermedio", "Avanzato"];
+const APP_VERSION = "1.2.2";
+const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
+  var year = String(dateStr).slice(0, 4);
+  var sheet = ss.getSheetByName(year);
+  if (!sheet) {
+    sheet = ss.insertSheet(year);
+    sheet.appendRow(['ID','Tipo','Importo','Categoria','Data','Nota']);
+  }
+  return sheet;
+}
+
+function doPost(e) {
+  var body = JSON.parse(e.postData.contents);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  if (body.action === 'append') {
+    var t = body.tx;
+    var sheet = getSheetForDate(ss, t.date);
+    sheet.appendRow([t.id, t.type, t.amount, t.categoryName, t.date, t.note || '']);
+
+  } else if (body.action === 'delete') {
+    ss.getSheets().forEach(function(sheet) {
+      if (!/^\\d{4}$/.test(sheet.getName())) return;
+      var data = sheet.getDataRange().getValues();
+      for (var i = data.length - 1; i >= 1; i--) {
+        if (data[i][0] === body.id) { sheet.deleteRow(i + 1); break; }
+      }
+    });
+
+  } else if (body.action === 'bulk') {
+    var byYear = {};
+    body.txs.forEach(function(t) {
+      var y = String(t.date).slice(0, 4);
+      if (!byYear[y]) byYear[y] = [];
+      byYear[y].push(t);
+    });
+    Object.keys(byYear).forEach(function(y) {
+      var sheet = getSheetForDate(ss, byYear[y][0].date);
+      var existing = sheet.getDataRange().getValues().slice(1).map(function(r){ return r[0]; });
+      byYear[y].forEach(function(t) {
+        if (existing.indexOf(t.id) === -1) {
+          sheet.appendRow([t.id, t.type, t.amount, t.categoryName, t.date, t.note || '']);
+        }
+      });
+    });
+
+  } else if (body.action === 'closeYear') {
+    var year = String(body.year);
+    var arch = ss.getSheetByName('Archivio') || ss.insertSheet('Archivio');
+    if (arch.getLastRow() === 0) arch.appendRow(['Anno', 'Categoria', 'Totale']);
+    var adata = arch.getDataRange().getValues();
+    for (var j = adata.length - 1; j >= 1; j--) {
+      if (String(adata[j][0]) === year) arch.deleteRow(j + 1);
+    }
+    (body.categories || []).forEach(function(c) {
+      arch.appendRow([year, c.name, c.total]);
+    });
+    var yearSheet = ss.getSheetByName(year);
+    if (yearSheet) ss.deleteSheet(yearSheet);
+  }
+  return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tz = Session.getScriptTimeZone();
+  var out = { transactions: [], archives: [] };
+  ss.getSheets().forEach(function(sheet) {
+    if (!/^\\d{4}$/.test(sheet.getName())) return;
+    if (sheet.getLastRow() <= 1) return;
+    var rows = sheet.getDataRange().getValues().slice(1);
+    rows.forEach(function(r) {
+      var d = r[4];
+      var dateStr = (d instanceof Date) ? Utilities.formatDate(d, tz, 'yyyy-MM-dd') : String(d);
+      out.transactions.push({ id: r[0], type: r[1], amount: r[2], categoryName: r[3], date: dateStr, note: r[5] || '' });
+    });
+  });
+  var arch = ss.getSheetByName('Archivio');
+  if (arch && arch.getLastRow() > 1) {
+    var byYear = {};
+    arch.getDataRange().getValues().slice(1).forEach(function(r) {
+      var y = String(r[0]);
+      if (!byYear[y]) byYear[y] = {};
+      byYear[y][r[1]] = r[2];
+    });
+    Object.keys(byYear).forEach(function(y) {
+      out.archives.push({ year: y, categoryTotals: byYear[y] });
+    });
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}`;
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+const eur = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(n || 0);
+const monthKey = (d) => d.slice(0, 7);
+const monthLabel = (k) => {
+  const [y, m] = k.split("-");
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("it-IT", { month: "short", year: "numeric" });
+};
+const timeAgo = (iso) => {
+  if (!iso) return "mai";
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 60) return "adesso";
+  if (diff < 3600) return `${Math.floor(diff / 60)} min fa`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} h fa`;
+  return `${Math.floor(diff / 86400)} g fa`;
+};
+
+/* ---------- persistenza locale (nel browser del dispositivo) ---------- */
+
+function loadKey(key, fallback) {
+  try {
+    const v = localStorage.getItem(key);
+    if (v) return JSON.parse(v);
+  } catch (e) { /* valore assente o non valido, uso il default */ }
+  return fallback;
+}
+function saveKey(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { console.error("storage error", key, e); }
+}
+
+function App() {
+  const [tab, setTab] = useState("dashboard");
+  const [categories, setCategories] = useState(() => loadKey("categories", DEFAULT_CATEGORIES));
+  const [transactions, setTransactions] = useState(() => loadKey("transactions", []));
+  const [topics] = useState(() => loadKey("topics", DEFAULT_TOPICS));
+  const [progress, setProgress] = useState(() => loadKey("progress", []));
+  const [resources, setResources] = useState(() => loadKey("resources", []));
+  const [archives, setArchives] = useState(() => loadKey("archives", []));
+  const [notes, setNotes] = useState(() => loadKey("notes", ""));
+  const [sheetUrl, setSheetUrlState] = useState(() => loadKey("sheet-url", ""));
+  const [lastSync, setLastSync] = useState(() => loadKey("last-sync", ""));
+  const [lastPull, setLastPull] = useState(() => loadKey("last-pull", ""));
+  const [syncing, setSyncing] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const [autoClosedYears, setAutoClosedYears] = useState([]);
+  const [pendingCount, setPendingCount] = useState(() => loadKey("pending-sync", []).length);
+
+  const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c])), [categories]);
+
+  function queueAdd(payload) {
+    const q = loadKey("pending-sync", []);
+    const next = [...q, { id: uid(), payload }];
+    saveKey("pending-sync", next);
+    setPendingCount(next.length);
+  }
+  function queueRemove(id) {
+    const q = loadKey("pending-sync", []);
+    const next = q.filter(i => i.id !== id);
+    saveKey("pending-sync", next);
+    setPendingCount(next.length);
+  }
+
+  // Riprova a inviare al foglio ciò che non era partito per mancanza di rete: al primo avvio
+  // e ogni volta che il dispositivo torna online.
+  useEffect(() => {
+    async function flushQueue() {
+      const url = loadKey("sheet-url", "");
+      if (!url) return;
+      const q = loadKey("pending-sync", []);
+      for (const item of q) {
+        try {
+          await fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(item.payload) });
+          queueRemove(item.id);
+          const ts = new Date().toISOString();
+          setLastSync(ts); saveKey("last-sync", ts);
+        } catch (e) { /* ancora offline, ci riproviamo più tardi */ }
+      }
+    }
+    flushQueue();
+    window.addEventListener("online", flushQueue);
+    return () => window.removeEventListener("online", flushQueue);
+  }, []); // eslint-disable-line
+
+  // Al primo avvio dell'app, chiude da solo qualunque anno ormai passato e mai archiviato:
+  // così anche se ci si dimentica, nulla resta appeso e nulla va perso (i totali restano per sempre).
+  useEffect(() => {
+    (async () => {
+      const currentYear = String(new Date().getFullYear());
+      let txs = loadKey("transactions", []);
+      let archs = loadKey("archives", []);
+      const cats = loadKey("categories", DEFAULT_CATEGORIES);
+      const catById = Object.fromEntries(cats.map(c => [c.id, c]));
+      const pastYears = Array.from(new Set(txs.map(t => t.date.slice(0, 4))))
+        .filter(y => y < currentYear && !archs.some(a => a.year === y))
+        .sort();
+      if (pastYears.length === 0) return;
+
+      const url = loadKey("sheet-url", "");
+      for (const year of pastYears) {
+        const totals = {}; const names = {};
+        let totalIncome = 0, totalExpense = 0;
+        cats.forEach(c => { names[c.id] = { name: c.name, icon: c.icon }; });
+        txs.forEach(t => {
+          if (t.date.slice(0, 4) !== year) return;
+          if (t.type === "income") totalIncome += t.amount;
+          else { totalExpense += t.amount; totals[t.categoryId] = (totals[t.categoryId] || 0) + t.amount; }
+        });
+        archs = [...archs.filter(a => a.year !== year), { year, categoryTotals: totals, categoryNames: names, totalIncome, totalExpense, saldo: totalIncome - totalExpense, closedAt: new Date().toISOString() }];
+        txs = txs.filter(t => t.date.slice(0, 4) !== year);
+        if (url) {
+          const catsPayload = Object.entries(totals).map(([id, total]) => ({ name: catById[id]?.name || names[id]?.name || "Altro", total }));
+          try {
+            await fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "closeYear", year, categories: catsPayload }) });
+          } catch (e) { console.error("auto-close sync error", e); }
+        }
+      }
+      saveKey("transactions", txs);
+      saveKey("archives", archs);
+      setTransactions(txs);
+      setArchives(archs);
+      setAutoClosedYears(pastYears);
+    })();
+  }, []); // eslint-disable-line
+
+  async function pushToSheet(payload) {
+    if (!sheetUrl) return;
+    try {
+      await fetch(sheetUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+      });
+      const ts = new Date().toISOString();
+      setLastSync(ts); saveKey("last-sync", ts);
+    } catch (e) {
+      console.error("sync error, messo in coda per riprovare al ritorno della rete", e);
+      queueAdd(payload);
+    }
+  }
+
+  function addTransaction(tx) {
+    const full = { ...tx, id: uid() };
+    const next = [full, ...transactions];
+    setTransactions(next); saveKey("transactions", next);
+    pushToSheet({ action: "append", tx: { ...full, categoryName: catMap[full.categoryId]?.name || full.categoryId } });
+  }
+  function removeTransaction(id) {
+    const next = transactions.filter(t => t.id !== id);
+    setTransactions(next); saveKey("transactions", next);
+    pushToSheet({ action: "delete", id });
+  }
+  async function syncAllNow() {
+    if (!sheetUrl) return;
+    setSyncing(true);
+    await pushToSheet({ action: "bulk", txs: transactions.map(t => ({ ...t, categoryName: catMap[t.categoryId]?.name || t.categoryId })) });
+    setSyncing(false);
+  }
+  async function pullFromSheet() {
+    if (!sheetUrl) return;
+    if (!window.confirm("Questo sostituirà le transazioni e gli archivi salvati su questo dispositivo con quelli presenti nel foglio Google. Continuare?")) return;
+    setPulling(true);
+    try {
+      const res = await fetch(sheetUrl, { method: "GET" });
+      const data = await res.json();
+      const byName = {};
+      let newCats = [...categories];
+      newCats.forEach(c => { byName[c.name.toLowerCase()] = c.id; });
+      function ensureCat(name, type) {
+        let id = byName[(name || "").toLowerCase()];
+        if (!id) {
+          const nc = { id: uid(), name: name || "Altro", icon: "🏷️", color: "#8A8578", type: type || "expense", budget: 0 };
+          newCats.push(nc); byName[nc.name.toLowerCase()] = nc.id; id = nc.id;
+        }
+        return id;
+      }
+      const archivedYears = new Set((data.archives || []).map(a => a.year));
+      const mapped = (data.transactions || [])
+        .filter(t => !archivedYears.has(String(t.date).slice(0, 4)))
+        .map(t => ({ id: t.id, type: t.type, amount: parseFloat(t.amount) || 0, categoryId: ensureCat(t.categoryName, t.type), date: t.date, note: t.note || "" }));
+      const mappedArchives = (data.archives || []).map(a => {
+        const categoryTotals = {};
+        const categoryNames = {};
+        Object.entries(a.categoryTotals || {}).forEach(([name, total]) => {
+          const id = ensureCat(name, "expense");
+          categoryTotals[id] = parseFloat(total) || 0;
+          categoryNames[id] = { name, icon: newCats.find(c => c.id === id)?.icon || "🏷️" };
+        });
+        const totalExpense = Object.values(categoryTotals).reduce((s, v) => s + v, 0);
+        return { year: a.year, categoryTotals, categoryNames, totalIncome: 0, totalExpense, saldo: -totalExpense, closedAt: new Date().toISOString() };
+      });
+      setCategories(newCats); saveKey("categories", newCats);
+      setTransactions(mapped); saveKey("transactions", mapped);
+      setArchives(mappedArchives); saveKey("archives", mappedArchives);
+      const ts = new Date().toISOString();
+      setLastPull(ts); saveKey("last-pull", ts);
+    } catch (e) {
+      console.error(e);
+      window.alert("Non sono riuscito a leggere dal foglio. Controlla il link nella scheda Backup e riprova.");
+    }
+    setPulling(false);
+  }
+  function saveSheetUrl(url) { setSheetUrlState(url); saveKey("sheet-url", url); }
+
+  async function closeYear(year) {
+    const inArchive = archives.some(a => a.year === year);
+    const msg = inArchive
+      ? `Il ${year} è già archiviato: verrà ricalcolato da capo con le transazioni attuali. Continuare?`
+      : `Le transazioni del ${year} verranno riassunte in un totale per categoria e poi eliminate in modo permanente da questo dispositivo (e dal foglio, se collegato). Non potrai più vederle giorno per giorno, solo il totale annuale. Continuare?`;
+    if (!window.confirm(msg)) return;
+
+    const totals = {}; const names = {};
+    let totalIncome = 0, totalExpense = 0;
+    categories.forEach(c => { names[c.id] = { name: c.name, icon: c.icon }; });
+    transactions.forEach(t => {
+      if (t.date.slice(0, 4) !== year) return;
+      if (t.type === "income") totalIncome += t.amount;
+      else { totalExpense += t.amount; totals[t.categoryId] = (totals[t.categoryId] || 0) + t.amount; }
+    });
+    const archive = { year, categoryTotals: totals, categoryNames: names, totalIncome, totalExpense, saldo: totalIncome - totalExpense, closedAt: new Date().toISOString() };
+    const nextArchives = [...archives.filter(a => a.year !== year), archive];
+    setArchives(nextArchives); saveKey("archives", nextArchives);
+
+    const remaining = transactions.filter(t => t.date.slice(0, 4) !== year);
+    setTransactions(remaining); saveKey("transactions", remaining);
+
+    const catsPayload = Object.entries(totals).map(([id, total]) => ({ name: catMap[id]?.name || names[id]?.name || "Altro", total }));
+    await pushToSheet({ action: "closeYear", year, categories: catsPayload });
+  }
+
+  function addCategory(cat) {
+    const next = [...categories, { ...cat, id: uid() }];
+    setCategories(next); saveKey("categories", next);
+  }
+  function updateCategory(id, patch) {
+    const next = categories.map(c => c.id === id ? { ...c, ...patch } : c);
+    setCategories(next); saveKey("categories", next);
+  }
+  function removeCategory(id) {
+    const next = categories.filter(c => c.id !== id);
+    setCategories(next); saveKey("categories", next);
+  }
+  function toggleTopic(id) {
+    const next = progress.includes(id) ? progress.filter(p => p !== id) : [...progress, id];
+    setProgress(next); saveKey("progress", next);
+  }
+  function addResource(res) {
+    const next = [{ ...res, id: uid(), done: false }, ...resources];
+    setResources(next); saveKey("resources", next);
+  }
+  function toggleResource(id) {
+    const next = resources.map(r => r.id === id ? { ...r, done: !r.done } : r);
+    setResources(next); saveKey("resources", next);
+  }
+  function removeResource(id) {
+    const next = resources.filter(r => r.id !== id);
+    setResources(next); saveKey("resources", next);
+  }
+  function saveNotes(v) { setNotes(v); saveKey("notes", v); }
+
+  const balance = transactions.reduce((s, t) => s + (t.type === "income" ? t.amount : -t.amount), 0)
+    + archives.reduce((s, a) => s + (a.saldo || 0), 0);
+
+  return (
+    <div style={S.app}>
+      <div style={S.shell}>
+        <header style={S.header}>
+          <div>
+            <div style={S.eyebrow}>MONEY TRACKER · SIMONE</div>
+            <h1 style={S.h1}>Registro</h1>
+          </div>
+          <div style={S.headerBalance}>
+            <span style={S.headerBalanceLabel}>saldo</span>
+            <span style={{ ...S.headerBalanceNum, color: balance >= 0 ? TOKENS.accent : TOKENS.negative }}>{eur(balance)}</span>
+          </div>
+        </header>
+
+        <nav style={S.tabs}>
+          <TabBtn active={tab==="dashboard"} onClick={()=>setTab("dashboard")} icon="▦" label="Dashboard" />
+          <TabBtn active={tab==="transazioni"} onClick={()=>setTab("transazioni")} icon="☰" label="Transazioni" />
+          <TabBtn active={tab==="categorie"} onClick={()=>setTab("categorie")} icon="🏷" label="Categorie" />
+          <TabBtn active={tab==="investimenti"} onClick={()=>setTab("investimenti")} icon="📖" label="Investimenti" />
+          <TabBtn active={tab==="backup"} onClick={()=>setTab("backup")} icon="☁" label="Backup" dot={!sheetUrl || pendingCount > 0} />
+        </nav>
+
+        <main style={S.main}>
+          {autoClosedYears.length > 0 && (
+            <div style={{ ...S.card, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, background: TOKENS.accentSoft, boxShadow: "none" }}>
+              <span style={{ fontSize: 16 }}>🔒</span>
+              <div style={{ flex: 1, fontSize: 13.5 }}>
+                Ho archiviato in automatico {autoClosedYears.length === 1 ? `l'anno ${autoClosedYears[0]}` : `gli anni ${autoClosedYears.join(", ")}`}: trovi i totali per categoria in Categorie → Confronto per anno.
+              </div>
+              <button onClick={()=>setAutoClosedYears([])} style={{ border: "none", background: "transparent", color: TOKENS.inkSoft, cursor: "pointer", fontSize: 14 }}>✕</button>
+            </div>
+          )}
+          {tab === "dashboard" && <Dashboard transactions={transactions} categories={categories} catMap={catMap} archives={archives} />}
+          {tab === "transazioni" && <Transazioni transactions={transactions} categories={categories} catMap={catMap} onAdd={addTransaction} onRemove={removeTransaction} />}
+          {tab === "categorie" && <Categorie categories={categories} transactions={transactions} archives={archives} onAdd={addCategory} onUpdate={updateCategory} onRemove={removeCategory} onCloseYear={closeYear} />}
+          {tab === "investimenti" && <Investimenti topics={topics} progress={progress} onToggleTopic={toggleTopic} resources={resources} onAddResource={addResource} onToggleResource={toggleResource} onRemoveResource={removeResource} notes={notes} onSaveNotes={saveNotes} />}
+          {tab === "backup" && <Backup sheetUrl={sheetUrl} onSaveUrl={saveSheetUrl} lastSync={lastSync} lastPull={lastPull} syncing={syncing} pulling={pulling} onSyncAll={syncAllNow} onPull={pullFromSheet} count={transactions.length} pendingCount={pendingCount} />}
+        </main>
+
+        <p style={S.footer}>Registro v{APP_VERSION} · vive su questo dispositivo, funziona anche offline. Collega il Backup per portare i dati anche su altri dispositivi.</p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- tokens & stile ---------- */
+
+const TOKENS = {
+  paper: "#F7F5F1", paper2: "#EFEBE2", ink: "#211F1C", inkSoft: "#78725f",
+  line: "#E4DFD3", accent: "#2F6F5E", accentSoft: "#E6EFE9",
+  negative: "#B4472F", negativeSoft: "#F5E6DF", amber: "#C99A3B", amberSoft: "#F5EBD6",
+};
+
+const S = {
+  app: { minHeight: "100vh", background: TOKENS.paper, color: TOKENS.ink, fontFamily: "'Inter', sans-serif" },
+  shell: { maxWidth: 860, margin: "0 auto", padding: "22px 18px 60px" },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18, flexWrap: "wrap", gap: 10 },
+  eyebrow: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: 2, color: TOKENS.inkSoft },
+  h1: { fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 32, margin: "2px 0 0" },
+  headerBalance: { display: "flex", flexDirection: "column", alignItems: "flex-end" },
+  headerBalanceLabel: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: TOKENS.inkSoft, letterSpacing: 1 },
+  headerBalanceNum: { fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 600 },
+  tabs: { display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" },
+  main: { display: "flex", flexDirection: "column", gap: 16 },
+  card: { background: "#fff", borderRadius: 14, padding: 18, boxShadow: "0 1px 2px rgba(33,31,28,0.04), 0 6px 16px rgba(33,31,28,0.04)" },
+  sectionTitle: { fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, margin: "0 0 12px" },
+  footer: { textAlign: "center", fontSize: 11.5, color: TOKENS.inkSoft, marginTop: 30, lineHeight: 1.6 },
+};
+
+function TabBtn({ active, onClick, icon, label, dot }) {
+  return (
+    <button onClick={onClick} style={{
+      position: "relative", display: "flex", alignItems: "center", gap: 6, padding: "8px 13px", borderRadius: 999,
+      border: "none", background: active ? TOKENS.ink : TOKENS.paper2,
+      color: active ? TOKENS.paper : TOKENS.inkSoft, fontSize: 13.5, fontWeight: 500, cursor: "pointer",
+    }}>
+      <span>{icon}</span>{label}
+      {dot && <span style={{ position: "absolute", top: 5, right: 5, width: 6, height: 6, borderRadius: "50%", background: TOKENS.amber }} />}
+    </button>
+  );
+}
+
+/* ---------- Dashboard ---------- */
+
+function Dashboard({ transactions, categories, catMap, archives }) {
+  const [catPeriod, setCatPeriod] = useState("mese");
+  const now = new Date();
+  const thisMonthKey = now.toISOString().slice(0, 7);
+  const thisYear = String(now.getFullYear());
+
+  const totalIncome = transactions.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0)
+    + archives.reduce((s, a) => s + (a.totalIncome || 0), 0);
+  const totalExpense = transactions.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0)
+    + archives.reduce((s, a) => s + (a.totalExpense || 0), 0);
+
+  const budgetAlerts = useMemo(() => {
+    return categories.filter(c => c.type === "expense" && c.budget > 0).map(c => {
+      const spent = transactions.filter(t => t.type === "expense" && t.categoryId === c.id && monthKey(t.date) === thisMonthKey).reduce((s, t) => s + t.amount, 0);
+      return { ...c, spent, pct: spent / c.budget };
+    }).filter(c => c.pct >= 0.8).sort((a, b) => b.pct - a.pct);
+  }, [categories, transactions, thisMonthKey]);
+
+  const monthly = useMemo(() => {
+    const map = {};
+    transactions.forEach(t => {
+      const k = monthKey(t.date);
+      if (!map[k]) map[k] = { key: k, entrate: 0, uscite: 0 };
+      if (t.type === "income") map[k].entrate += t.amount; else map[k].uscite += t.amount;
+    });
+    return Object.values(map).sort((a, b) => a.key.localeCompare(b.key)).map(m => ({
+      ...m, label: monthLabel(m.key), saldo: +(m.entrate - m.uscite).toFixed(2),
+    }));
+  }, [transactions]);
+
+  const catData = useMemo(() => {
+    const filtered = transactions.filter(t => {
+      if (t.type !== "expense") return false;
+      if (catPeriod === "mese") return monthKey(t.date) === thisMonthKey;
+      if (catPeriod === "anno") return t.date.slice(0, 4) === thisYear;
+      return true;
+    });
+    const map = {};
+    filtered.forEach(t => { map[t.categoryId] = (map[t.categoryId] || 0) + t.amount; });
+    return Object.entries(map)
+      .map(([id, value]) => ({ id, value: +value.toFixed(2), name: catMap[id]?.name || "Altro", color: catMap[id]?.color || "#999" }))
+      .sort((a, b) => b.value - a.value).slice(0, 8);
+  }, [transactions, catPeriod, thisMonthKey, thisYear, catMap]);
+
+  if (transactions.length === 0) {
+    return (
+      <div style={S.card}>
+        <p style={{ fontFamily: "'Fraunces', serif", fontSize: 20, margin: "0 0 6px" }}>Il registro è vuoto.</p>
+        <p style={{ color: TOKENS.inkSoft, fontSize: 14, lineHeight: 1.6, margin: 0 }}>
+          Aggiungi la tua prima transazione dalla scheda "Transazioni": da lì Registro calcola tutto in automatico, andamento mensile, categorie principali e avvisi di budget.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {budgetAlerts.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {budgetAlerts.map(c => {
+            const over = c.pct >= 1;
+            return (
+              <div key={c.id} style={{ ...S.card, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, background: over ? TOKENS.negativeSoft : TOKENS.amberSoft, boxShadow: "none" }}>
+                <span style={{ fontSize: 16 }}>⚠️</span>
+                <div style={{ flex: 1, fontSize: 13.5 }}>
+                  <b>{c.icon} {c.name}</b>: {eur(c.spent)} su {eur(c.budget)} {over ? "— budget superato" : "— quasi al limite"} questo mese
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))", gap: 12 }}>
+        <StatCard label="Entrate totali" value={eur(totalIncome)} tone="pos" icon="↗" />
+        <StatCard label="Uscite totali" value={eur(totalExpense)} tone="neg" icon="↘" />
+        <StatCard label="Transazioni" value={transactions.length} icon="◆" />
+      </div>
+
+      <div style={S.card}>
+        <h3 style={S.sectionTitle}>Andamento mensile</h3>
+        <ResponsiveContainer width="100%" height={220}>
+          <AreaChart data={monthly} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+            <defs>
+              <linearGradient id="gEnt" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={TOKENS.accent} stopOpacity={0.35}/>
+                <stop offset="95%" stopColor={TOKENS.accent} stopOpacity={0}/>
+              </linearGradient>
+              <linearGradient id="gUsc" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={TOKENS.negative} stopOpacity={0.3}/>
+                <stop offset="95%" stopColor={TOKENS.negative} stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke={TOKENS.line} vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={{ stroke: TOKENS.line }} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={false} tickLine={false} width={46} />
+            <Tooltip formatter={(v) => eur(v)} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8 }} />
+            <Area type="monotone" dataKey="entrate" stroke={TOKENS.accent} fill="url(#gEnt)" strokeWidth={2} />
+            <Area type="monotone" dataKey="uscite" stroke={TOKENS.negative} fill="url(#gUsc)" strokeWidth={2} />
+          </AreaChart>
+        </ResponsiveContainer>
+        <div style={{ display: "flex", gap: 16, marginTop: 6, fontSize: 12.5, color: TOKENS.inkSoft }}>
+          <LegendDot color={TOKENS.accent} label="entrate" />
+          <LegendDot color={TOKENS.negative} label="uscite" />
+        </div>
+      </div>
+
+      <div style={S.card}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+          <h3 style={S.sectionTitle}>Categorie principali</h3>
+          <div style={{ display: "flex", gap: 4 }}>
+            {[["mese","mese"],["anno","anno"],["sempre","sempre"]].map(([v,l]) => (
+              <button key={v} onClick={()=>setCatPeriod(v)} style={{
+                fontSize: 11.5, padding: "5px 10px", borderRadius: 999, cursor: "pointer", border: "none",
+                background: catPeriod===v?TOKENS.ink:TOKENS.paper2, color: catPeriod===v?TOKENS.paper:TOKENS.inkSoft,
+              }}>{l}</button>
+            ))}
+          </div>
+        </div>
+        {catData.length === 0 ? (
+          <p style={{ color: TOKENS.inkSoft, fontSize: 13.5 }}>Nessuna spesa in questo periodo.</p>
+        ) : (
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "center" }}>
+            <ResponsiveContainer width={180} height={180}>
+              <PieChart>
+                <Pie data={catData} dataKey="value" nameKey="name" innerRadius={48} outerRadius={78} paddingAngle={2}>
+                  {catData.map((d, i) => <Cell key={i} fill={d.color} stroke="#fff" strokeWidth={1} />)}
+                </Pie>
+                <Tooltip formatter={(v) => eur(v)} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8 }} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ flex: 1, minWidth: 180, display: "flex", flexDirection: "column", gap: 8 }}>
+              {catData.map(d => (
+                <div key={d.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <span style={{ width: 9, height: 9, borderRadius: 3, background: d.color, display: "inline-block" }} />
+                    {d.name}
+                  </span>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{eur(d.value)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={S.card}>
+        <h3 style={S.sectionTitle}>Riepilogo mensile</h3>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1fr", fontSize: 11, letterSpacing: 1, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", padding: "0 0 8px", borderBottom: `1px solid ${TOKENS.ink}` }}>
+            <span>MESE</span><span style={{ textAlign: "right" }}>ENTRATE</span><span style={{ textAlign: "right" }}>USCITE</span><span style={{ textAlign: "right" }}>SALDO</span>
+          </div>
+          {[...monthly].reverse().map(m => (
+            <div key={m.key} style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1fr", fontSize: 13.5, padding: "9px 0", borderBottom: `1px solid ${TOKENS.line}`, fontFamily: "'IBM Plex Mono', monospace" }}>
+              <span style={{ fontFamily: "Inter" }}>{m.label}</span>
+              <span style={{ textAlign: "right", color: TOKENS.accent }}>{eur(m.entrate)}</span>
+              <span style={{ textAlign: "right", color: TOKENS.negative }}>{eur(m.uscite)}</span>
+              <span style={{ textAlign: "right", fontWeight: 600, color: m.saldo >= 0 ? TOKENS.accent : TOKENS.negative }}>{eur(m.saldo)}</span>
+            </div>
+          ))}
+        </div>
+        {archives.length > 0 && (
+          <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 10 }}>
+            Gli anni archiviati ({archives.map(a=>a.year).sort().join(", ")}) non compaiono qui in dettaglio mensile: trovi i loro totali per categoria in Categorie → Confronto per anno.
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
+
+function StatCard({ label, value, tone, icon }) {
+  const color = tone === "pos" ? TOKENS.accent : tone === "neg" ? TOKENS.negative : TOKENS.ink;
+  return (
+    <div style={{ ...S.card, padding: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, color: TOKENS.inkSoft, fontSize: 11.5, letterSpacing: 0.5, fontFamily: "'IBM Plex Mono', monospace" }}>
+        <span>{icon}</span>{label.toUpperCase()}
+      </div>
+      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600, color, marginTop: 4 }}>{value}</div>
+    </div>
+  );
+}
+function LegendDot({ color, label }) {
+  return <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, background: color, borderRadius: "50%", display: "inline-block" }} />{label}</span>;
+}
+
+/* ---------- Transazioni ---------- */
+
+function Transazioni({ transactions, categories, catMap, onAdd, onRemove }) {
+  const [showForm, setShowForm] = useState(false);
+  const [confirmId, setConfirmId] = useState(null);
+  const [filterType, setFilterType] = useState("all");
+  const [filterCat, setFilterCat] = useState("all");
+
+  const filtered = transactions.filter(t =>
+    (filterType === "all" || t.type === filterType) &&
+    (filterCat === "all" || t.categoryId === filterCat)
+  );
+
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <SelectPill value={filterType} onChange={setFilterType} options={[["all","Tutte"],["income","Entrate"],["expense","Uscite"]]} />
+          <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={pillSelectStyle}>
+            <option value="all">Tutte le categorie</option>
+            {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+          </select>
+        </div>
+        <button onClick={()=>setShowForm(s=>!s)} style={btnPrimary}>
+          <span>{showForm ? "✕" : "+"}</span> {showForm ? "Chiudi" : "Nuova"}
+        </button>
+      </div>
+
+      {showForm && <TxForm categories={categories} onSubmit={(tx)=>{ onAdd(tx); setShowForm(false); }} />}
+
+      <div style={{ ...S.card, padding: 0, overflow: "hidden" }}>
+        {filtered.length === 0 ? (
+          <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, padding: 18, margin: 0 }}>Nessuna transazione trovata.</p>
+        ) : filtered.map((t, i) => {
+          const c = catMap[t.categoryId];
+          return (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: i === filtered.length-1 ? "none" : `1px solid ${TOKENS.line}` }}>
+              <div style={{ width: 34, height: 34, borderRadius: 8, background: (c?.color||"#999")+"22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{c?.icon || "•"}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{c?.name || "Senza categoria"}</div>
+                <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
+                  {new Date(t.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
+                  {t.note ? ` · ${t.note}` : ""}
+                </div>
+              </div>
+              <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, fontSize: 14.5, color: t.type === "income" ? TOKENS.accent : TOKENS.negative, whiteSpace: "nowrap" }}>
+                {t.type === "income" ? "+" : "−"}{eur(t.amount)}
+              </div>
+              <button onClick={() => confirmId === t.id ? (onRemove(t.id), setConfirmId(null)) : setConfirmId(t.id)}
+                style={{ border: "none", background: confirmId === t.id ? TOKENS.negative : "transparent", color: confirmId === t.id ? "#fff" : TOKENS.inkSoft, borderRadius: 6, padding: "6px 8px", cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                <span>🗑</span>{confirmId === t.id ? "conferma" : ""}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function TxForm({ categories, onSubmit }) {
+  const [type, setType] = useState("expense");
+  const [amount, setAmount] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [date, setDate] = useState(todayISO());
+  const [note, setNote] = useState("");
+  const opts = categories.filter(c => c.type === type);
+
+  useEffect(() => { setCategoryId(opts[0]?.id || ""); }, [type]); // eslint-disable-line
+
+  function submit(e) {
+    e.preventDefault();
+    const n = parseFloat(String(amount).replace(",", "."));
+    if (!n || n <= 0 || !categoryId) return;
+    onSubmit({ type, amount: n, categoryId, date, note: note.trim() });
+  }
+
+  return (
+    <form onSubmit={submit} style={{ ...S.card, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", gap: 6 }}>
+        {[["expense","Uscita"],["income","Entrata"]].map(([v,l]) => (
+          <button type="button" key={v} onClick={()=>setType(v)} style={{
+            flex: 1, padding: "9px 0", borderRadius: 8, cursor: "pointer", fontSize: 13.5, fontWeight: 500, border: "none",
+            background: type===v ? (v==="income"?TOKENS.accentSoft:TOKENS.negativeSoft) : TOKENS.paper2,
+            color: type===v ? (v==="income"?TOKENS.accent:TOKENS.negative) : TOKENS.inkSoft,
+          }}>{l}</button>
+        ))}
+      </div>
+      <div className="grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <Field label="Importo (€)"><input required type="number" step="0.01" min="0" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00" style={inputStyle} /></Field>
+        <Field label="Data"><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inputStyle} /></Field>
+      </div>
+      <Field label="Categoria">
+        <select value={categoryId} onChange={e=>setCategoryId(e.target.value)} style={inputStyle}>
+          {opts.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+        </select>
+      </Field>
+      <Field label="Nota (opzionale)"><input value={note} onChange={e=>setNote(e.target.value)} placeholder="es. cena con amici" style={inputStyle} /></Field>
+      <button type="submit" style={{ ...btnPrimary, justifyContent: "center" }}><span>✓</span> Salva transazione</button>
+    </form>
+  );
+}
+
+/* ---------- Categorie ---------- */
+
+function Categorie({ categories, transactions, archives, onAdd, onUpdate, onRemove, onCloseYear }) {
+  const [showForm, setShowForm] = useState(false);
+  const [confirmId, setConfirmId] = useState(null);
+  const [yearToClose, setYearToClose] = useState("");
+
+  const liveYears = useMemo(() => {
+    const ys = new Set(transactions.map(t => t.date.slice(0, 4)));
+    ys.add(String(new Date().getFullYear()));
+    return Array.from(ys);
+  }, [transactions]);
+  const archivedYearSet = useMemo(() => new Set(archives.map(a => a.year)), [archives]);
+  const years = useMemo(() => Array.from(new Set([...liveYears, ...archivedYearSet])).sort().reverse(), [liveYears, archivedYearSet]);
+
+  // righe: categorie di spesa attuali + eventuali categorie storiche non più esistenti ma presenti negli archivi
+  const rows = useMemo(() => {
+    const currentExpenseIds = new Set(categories.filter(c => c.type === "expense").map(c => c.id));
+    const allIds = new Set(currentExpenseIds);
+    archives.forEach(a => Object.keys(a.categoryTotals || {}).forEach(id => allIds.add(id)));
+    return Array.from(allIds).map(id => {
+      const live = categories.find(c => c.id === id);
+      let fallback = null;
+      archives.forEach(a => { if (a.categoryNames && a.categoryNames[id]) fallback = a.categoryNames[id]; });
+      return { id, name: live?.name || fallback?.name || "Categoria eliminata", icon: live?.icon || fallback?.icon || "🗂️" };
+    });
+  }, [categories, archives]);
+
+  function cellValue(rowId, year) {
+    if (archivedYearSet.has(year)) {
+      const a = archives.find(x => x.year === year);
+      return (a && a.categoryTotals[rowId]) || 0;
+    }
+    return transactions.filter(t => t.categoryId === rowId && t.type === "expense" && t.date.slice(0, 4) === year).reduce((s, t) => s + t.amount, 0);
+  }
+  function yearTotal(year) {
+    if (archivedYearSet.has(year)) {
+      const a = archives.find(x => x.year === year);
+      return a ? a.totalExpense : 0;
+    }
+    return transactions.filter(t => t.type === "expense" && t.date.slice(0, 4) === year).reduce((s, t) => s + t.amount, 0);
+  }
+
+  const closableYears = liveYears.filter(y => transactions.some(t => t.date.slice(0,4) === y)).sort().reverse();
+
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h3 style={S.sectionTitle}>Le tue categorie</h3>
+        <button onClick={()=>setShowForm(s=>!s)} style={btnPrimary}><span>{showForm ? "✕" : "+"}</span> {showForm ? "Chiudi" : "Nuova"}</button>
+      </div>
+      <p style={{ color: TOKENS.inkSoft, fontSize: 12.5, margin: "-10px 0 4px" }}>Imposta un budget mensile sulle categorie di spesa per ricevere un avviso automatico in dashboard quando ti avvicini al limite.</p>
+
+      {showForm && <CatForm onSubmit={(c)=>{ onAdd(c); setShowForm(false); }} />}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px,1fr))", gap: 8 }}>
+        {categories.map(c => (
+          <div key={c.id} style={{ ...S.card, padding: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 18 }}>{c.icon}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
+                <div style={{ fontSize: 10.5, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>{c.type === "income" ? "entrata" : "uscita"}</div>
+              </div>
+              <button onClick={() => confirmId === c.id ? (onRemove(c.id), setConfirmId(null)) : setConfirmId(c.id)}
+                style={{ border: "none", background: "transparent", color: confirmId === c.id ? TOKENS.negative : TOKENS.line, cursor: "pointer", flexShrink: 0 }}>
+                🗑
+              </button>
+            </div>
+            {c.type === "expense" && (
+              <input type="number" min="0" placeholder="budget mensile €" value={c.budget || ""} onChange={e=>onUpdate(c.id, { budget: parseFloat(e.target.value) || 0 })}
+                style={{ ...inputStyle, padding: "5px 8px", fontSize: 11.5 }} />
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div style={S.card}>
+        <h3 style={S.sectionTitle}>Confronto per anno</h3>
+        <div style={{ overflowX: "auto" }}>
+          <div style={{ minWidth: 340 }}>
+            <div style={{ display: "grid", gridTemplateColumns: `1.4fr repeat(${years.length}, 1fr)`, fontSize: 11, letterSpacing: 1, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", padding: "0 0 8px", borderBottom: `1px solid ${TOKENS.ink}` }}>
+              <span>CATEGORIA</span>
+              {years.map(y => <span key={y} style={{ textAlign: "right" }}>{y}{archivedYearSet.has(y) ? " 🔒" : ""}</span>)}
+            </div>
+            {rows.map(row => (
+              <div key={row.id} style={{ display: "grid", gridTemplateColumns: `1.4fr repeat(${years.length}, 1fr)`, fontSize: 13, padding: "8px 0", borderBottom: `1px solid ${TOKENS.line}` }}>
+                <span>{row.icon} {row.name}</span>
+                {years.map(y => {
+                  const v = cellValue(row.id, y);
+                  return <span key={y} style={{ textAlign: "right", fontFamily: "'IBM Plex Mono', monospace", color: v ? TOKENS.ink : TOKENS.line }}>{v ? eur(v) : "—"}</span>;
+                })}
+              </div>
+            ))}
+            <div style={{ display: "grid", gridTemplateColumns: `1.4fr repeat(${years.length}, 1fr)`, fontSize: 13.5, fontWeight: 600, padding: "10px 0 0" }}>
+              <span>Totale spese</span>
+              {years.map(y => <span key={y} style={{ textAlign: "right", fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.negative }}>{eur(yearTotal(y))}</span>)}
+            </div>
+          </div>
+        </div>
+        {archives.length > 0 && <p style={{ fontSize: 11.5, color: TOKENS.inkSoft, marginTop: 10 }}>🔒 = anno archiviato: le transazioni di dettaglio sono state eliminate, resta solo il totale per categoria.</p>}
+      </div>
+
+      <div style={S.card}>
+        <h3 style={S.sectionTitle}>Chiudi un anno</h3>
+        <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, lineHeight: 1.6, margin: "0 0 12px" }}>
+          Gli anni ormai passati vengono chiusi da soli al primo avvio dell'app nell'anno nuovo: Registro calcola il totale per categoria (la tabella qui sopra), lo conserva per sempre, e cancella le singole transazioni per non appesantire l'app e il foglio di backup. Da qui puoi anche chiudere manualmente un anno in anticipo, se vuoi.
+        </p>
+        {closableYears.length === 0 ? (
+          <p style={{ color: TOKENS.inkSoft, fontSize: 13.5 }}>Non ci sono anni con transazioni da chiudere al momento.</p>
+        ) : (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <select value={yearToClose} onChange={e=>setYearToClose(e.target.value)} style={inputStyle}>
+              <option value="">Scegli l'anno…</option>
+              {closableYears.map(y => <option key={y} value={y}>{y}{y === String(new Date().getFullYear()) ? " (in corso)" : ""}</option>)}
+            </select>
+            <button onClick={()=>{ if(yearToClose){ onCloseYear(yearToClose); setYearToClose(""); } }} disabled={!yearToClose}
+              style={{ ...btnPrimary, background: TOKENS.negative }}>
+              🔒 Chiudi e archivia
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function CatForm({ onSubmit }) {
+  const [name, setName] = useState("");
+  const [icon, setIcon] = useState("🏷️");
+  const [type, setType] = useState("expense");
+  const [color, setColor] = useState("#2F6F5E");
+
+  function submit(e) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onSubmit({ name: name.trim(), icon: icon || "🏷️", type, color, budget: 0 });
+  }
+
+  return (
+    <form onSubmit={submit} style={{ ...S.card, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "60px 1fr", gap: 10 }}>
+        <Field label="Icona"><input value={icon} onChange={e=>setIcon(e.target.value)} maxLength={2} style={{ ...inputStyle, textAlign: "center" }} /></Field>
+        <Field label="Nome"><input value={name} onChange={e=>setName(e.target.value)} placeholder="es. Regali" style={inputStyle} /></Field>
+      </div>
+      <div className="grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <Field label="Tipo">
+          <select value={type} onChange={e=>setType(e.target.value)} style={inputStyle}>
+            <option value="expense">Uscita</option><option value="income">Entrata</option>
+          </select>
+        </Field>
+        <Field label="Colore"><input type="color" value={color} onChange={e=>setColor(e.target.value)} style={{ ...inputStyle, padding: 3, height: 38 }} /></Field>
+      </div>
+      <button type="submit" style={{ ...btnPrimary, justifyContent: "center" }}><span>✓</span> Aggiungi categoria</button>
+    </form>
+  );
+}
+
+/* ---------- Investimenti ---------- */
+
+function Investimenti({ topics, progress, onToggleTopic, resources, onAddResource, onToggleResource, onRemoveResource, notes, onSaveNotes }) {
+  const [showForm, setShowForm] = useState(false);
+  const done = topics.filter(t => progress.includes(t.id)).length;
+
+  return (
+    <>
+      <div style={S.card}>
+        <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: 1.5, color: TOKENS.amber, margin: "0 0 4px" }}>PERCORSO DI STUDIO</p>
+        <h3 style={{ ...S.sectionTitle, margin: "0 0 4px" }}>Impara a investire, un passo alla volta</h3>
+        <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, margin: "0 0 10px", lineHeight: 1.6 }}>
+          Una checklist di concetti e letture per iniziare a orientarti. Spunta ciò che hai già approfondito — {done}/{topics.length} completati.
+        </p>
+        <div style={{ height: 6, background: TOKENS.paper2, borderRadius: 99, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${(done/topics.length)*100}%`, background: TOKENS.amber, transition: "width .3s" }} />
+        </div>
+      </div>
+
+      {LEVELS.map(level => (
+        <div key={level} style={S.card}>
+          <h4 style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 600, margin: "0 0 10px" }}>{level}</h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {topics.filter(t => t.level === level).map(t => {
+              const isDone = progress.includes(t.id);
+              return (
+                <div key={t.id} onClick={()=>onToggleTopic(t.id)} style={{ display: "flex", gap: 10, cursor: "pointer", padding: 8, borderRadius: 8, background: isDone ? TOKENS.accentSoft : "transparent" }}>
+                  <div style={{ width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${isDone?TOKENS.accent:TOKENS.line}`, background: isDone?TOKENS.accent:"transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1, color: "#fff", fontSize: 12 }}>
+                    {isDone && "✓"}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 500, textDecoration: isDone ? "line-through" : "none", color: isDone ? TOKENS.inkSoft : TOKENS.ink }}>
+                      {t.title} <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: TOKENS.amber, fontWeight: 400 }}>· {t.kind}</span>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: TOKENS.inkSoft, marginTop: 2, lineHeight: 1.5 }}>{t.note}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      <div style={S.card}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={S.sectionTitle}>Le tue risorse</h3>
+          <button onClick={()=>setShowForm(s=>!s)} style={btnPrimary}><span>{showForm ? "✕" : "+"}</span> {showForm ? "Chiudi" : "Aggiungi"}</button>
+        </div>
+        {showForm && <ResourceForm onSubmit={(r)=>{ onAddResource(r); setShowForm(false); }} />}
+        {resources.length === 0 ? (
+          <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, margin: "10px 0 0" }}>Qui potrai salvare libri, articoli o video che trovi da solo man mano che studi.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+            {resources.map(r => (
+              <div key={r.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderTop: `1px solid ${TOKENS.line}` }}>
+                <div onClick={()=>onToggleResource(r.id)} style={{ width: 18, height: 18, marginTop: 2, borderRadius: 5, border: `1.5px solid ${r.done?TOKENS.accent:TOKENS.line}`, background: r.done?TOKENS.accent:"transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 11 }}>
+                  {r.done && "✓"}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 500, textDecoration: r.done ? "line-through" : "none" }}>{r.title}</div>
+                  {r.note && <div style={{ fontSize: 12.5, color: TOKENS.inkSoft }}>{r.note}</div>}
+                </div>
+                <button onClick={()=>onRemoveResource(r.id)} style={{ border: "none", background: "transparent", color: TOKENS.line, cursor: "pointer" }}>🗑</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={S.card}>
+        <h3 style={S.sectionTitle}>Appunti</h3>
+        <textarea value={notes} onChange={e=>onSaveNotes(e.target.value)} placeholder="Scrivi qui le tue riflessioni mentre studi…" style={{ ...inputStyle, minHeight: 110, resize: "vertical", fontFamily: "Inter" }} />
+      </div>
+    </>
+  );
+}
+
+function ResourceForm({ onSubmit }) {
+  const [title, setTitle] = useState("");
+  const [note, setNote] = useState("");
+  function submit(e) { e.preventDefault(); if (!title.trim()) return; onSubmit({ title: title.trim(), note: note.trim() }); }
+  return (
+    <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${TOKENS.line}` }}>
+      <Field label="Titolo"><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="es. video su ETF di X" style={inputStyle} /></Field>
+      <Field label="Nota (opzionale)"><input value={note} onChange={e=>setNote(e.target.value)} placeholder="dove l'hai trovato, cosa ricordare" style={inputStyle} /></Field>
+      <button type="submit" style={{ ...btnPrimary, justifyContent: "center" }}><span>✓</span> Salva risorsa</button>
+    </form>
+  );
+}
+
+/* ---------- Backup su Google Sheets ---------- */
+
+function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onSyncAll, onPull, count, pendingCount }) {
+  const [draft, setDraft] = useState(sheetUrl);
+  const [openGuide, setOpenGuide] = useState(!sheetUrl);
+  const [copied, setCopied] = useState(false);
+
+  function copyCode() {
+    navigator.clipboard.writeText(APPS_SCRIPT_CODE).then(() => { setCopied(true); setTimeout(()=>setCopied(false), 1800); });
+  }
+
+  return (
+    <>
+      <div style={{ ...S.card, display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: sheetUrl ? TOKENS.accent : TOKENS.line, flexShrink: 0 }} />
+          <h3 style={{ ...S.sectionTitle, margin: 0 }}>{sheetUrl ? "Collegato a Google Sheets" : "Non ancora collegato"}</h3>
+        </div>
+        <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, lineHeight: 1.6, margin: "6px 0 14px" }}>
+          Le transazioni vivono nella memoria di questo browser: se cambi telefono o computer, ripartono da zero finché non "carichi" il backup da qui. Il foglio Google è quindi sia il backup che il modo per portare i dati su un altro dispositivo.
+        </p>
+        <Field label="URL dell'Apps Script (Web App)">
+          <input value={draft} onChange={e=>setDraft(e.target.value)} placeholder="https://script.google.com/macros/s/…/exec" style={inputStyle} />
+        </Field>
+        <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+          <button onClick={()=>onSaveUrl(draft.trim())} style={btnPrimary}><span>✓</span> Salva collegamento</button>
+          {sheetUrl && (
+            <button onClick={onSyncAll} disabled={syncing} style={{ ...btnPrimary, background: TOKENS.paper2, color: TOKENS.ink }}>
+              <span>⟳</span> {syncing ? "Sincronizzo…" : `Invia tutto al foglio (${count})`}
+            </button>
+          )}
+          {sheetUrl && (
+            <button onClick={onPull} disabled={pulling} style={{ ...btnPrimary, background: TOKENS.amberSoft, color: TOKENS.ink }}>
+              <span>⬇</span> {pulling ? "Carico…" : "Carica da questo foglio"}
+            </button>
+          )}
+        </div>
+        {sheetUrl && (
+          <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 10, fontFamily: "'IBM Plex Mono', monospace" }}>
+            ultimo invio: {timeAgo(lastSync)} · ultimo caricamento: {timeAgo(lastPull)}
+            {pendingCount > 0 && <span style={{ color: TOKENS.amber }}> · {pendingCount} in attesa di rete</span>}
+          </p>
+        )}
+      </div>
+
+      <div style={S.card}>
+        <button onClick={()=>setOpenGuide(o=>!o)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+          <h3 style={{ ...S.sectionTitle, margin: 0 }}>Come creare il collegamento (5 minuti)</h3>
+          <span style={{ transform: openGuide ? "rotate(180deg)" : "none", transition: "transform .2s", color: TOKENS.inkSoft, display: "inline-block" }}>▾</span>
+        </button>
+        {openGuide && (
+          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+            {[
+              "Apri Google Sheets e crea un nuovo foglio vuoto (sarà il tuo backup, non serve intestarlo).",
+              "Vai su Estensioni → Apps Script. Si apre un editor con del codice di esempio: cancellalo tutto.",
+              "Incolla il codice qui sotto (tocca l'icona per copiarlo) e salva (icona a forma di dischetto).",
+              "Clicca su Esegui il deployment → Nuovo deployment → tipo Web app.",
+              "Imposta \"Esegui come\": Me, e \"Chi ha accesso\": Chiunque. Poi Esegui il deployment.",
+              "Google chiederà di autorizzare lo script al primo avvio: sei tu il proprietario, quindi conferma.",
+              "Copia l'URL che termina in /exec e incollalo nel campo sopra, su ogni dispositivo su cui apri l'app.",
+            ].map((step, i) => (
+              <div key={i} style={{ display: "flex", gap: 10, fontSize: 13.5, lineHeight: 1.5 }}>
+                <span style={{ fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.amber, flexShrink: 0 }}>{String(i+1).padStart(2,"0")}</span>
+                <span>{step}</span>
+              </div>
+            ))}
+            <div style={{ position: "relative", marginTop: 6 }}>
+              <pre style={{ background: TOKENS.ink, color: "#E7E3D8", fontSize: 11.5, padding: 14, borderRadius: 10, overflowX: "auto", fontFamily: "'IBM Plex Mono', monospace", lineHeight: 1.6, margin: 0 }}>{APPS_SCRIPT_CODE}</pre>
+              <button onClick={copyCode} style={{ position: "absolute", top: 8, right: 8, border: "none", background: "rgba(255,255,255,0.12)", color: "#fff", borderRadius: 6, padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 11 }}>
+                <span>{copied ? "✓✓" : "⧉"}</span> {copied ? "copiato" : "copia"}
+              </button>
+            </div>
+            <p style={{ fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.6, marginTop: 4 }}>
+              Nota: l'URL dà lettura e scrittura su quel foglio a chiunque lo conosca — non condividerlo. "Invia tutto al foglio" spedisce le transazioni evitando duplicati; "Carica da questo foglio" fa il percorso inverso e sostituisce i dati locali, utile appena apri l'app su un nuovo dispositivo.
+            </p>
+            <p style={{ fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.6, marginTop: 0 }}>
+              Per tenerlo leggero nel tempo, ci sono due livelli: lo script crea da solo un tab per anno (2026, 2027…) invece di un unico elenco infinito; e quando in Categorie usi "Chiudi un anno", quel tab con le transazioni sparisce del tutto dal foglio e resta solo una riga di totale per categoria nel tab "Archivio" — permanente, leggerissimo, per sempre.
+            </p>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/* ---------- pezzi UI condivisi ---------- */
+
+function Field({ label, children }) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 12, color: TOKENS.inkSoft }}>
+      {label}
+      {children}
+    </label>
+  );
+}
+function SelectPill({ value, onChange, options }) {
+  return (
+    <select value={value} onChange={e=>onChange(e.target.value)} style={pillSelectStyle}>
+      {options.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+    </select>
+  );
+}
+
+const inputStyle = { padding: "9px 10px", borderRadius: 8, border: `1px solid ${TOKENS.line}`, fontSize: 13.5, background: "#fff", color: TOKENS.ink, width: "100%" };
+const pillSelectStyle = { padding: "7px 10px", borderRadius: 999, border: "none", fontSize: 12.5, background: TOKENS.paper2, color: TOKENS.inkSoft };
+const btnPrimary = { display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 8, border: "none", background: TOKENS.ink, color: TOKENS.paper, fontSize: 13.5, fontWeight: 500, cursor: "pointer" };
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+
+</script>
+</body>
+</html>

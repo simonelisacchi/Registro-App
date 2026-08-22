@@ -1,5 +1,11 @@
 # Changelog — Registro
 
+## v1.2.3 — correzione seria
+- **Trovata la vera causa dello schermo bianco**, confermata guardando dal vivo la console del tuo browser: (1) Babel, la libreria che traduce il codice, era rilasciata "senza numero di versione" e ha silenziosamente ricevuto un aggiornamento importante (versione 8) incompatibile con l'app; (2) il servizio da cui scaricavo le librerie (unpkg) stava rispondendo con errori temporanei proprio sul pacchetto dei grafici.
+- **Cambiato fornitore delle librerie esterne**: da unpkg a jsDelivr, più stabile.
+- **Tutte le versioni ora sono bloccate a un numero preciso** (React 18.3.1, Recharts 2.15.4, Babel 7.28.1, ecc.) — non prenderanno mai più aggiornamenti automatici a mia insaputa che potrebbero rompere l'app.
+- Verificato dal vivo, nel browser, prima di consegnarlo: caricamento delle librerie, traduzione del codice e disegno a schermo, tutti confermati funzionanti.
+
 ## v1.2.2
 - Icona dell'app sostituita con il tuo vero logo (Logo_Dark, dal progetto) al posto del segnaposto disegnato prima.
 

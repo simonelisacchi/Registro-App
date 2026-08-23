@@ -32,6 +32,39 @@
   input, select, textarea, button { font-family: 'Inter', sans-serif; }
   input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid #C99A3B; outline-offset: 1px; }
   @media (min-width: 640px) { .grid-2 { grid-template-columns: 1fr 1fr !important; } }
+
+  .tabs-nav {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
+    display: flex; justify-content: space-around; align-items: stretch; gap: 2px;
+    background: #fff; border-top: 1px solid #E4DFD3;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  }
+  .tab-btn-el {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; flex: 1; min-width: 0; padding: 5px 2px; border: none; background: transparent;
+    color: #78725f; font-size: 10px; font-weight: 500; cursor: pointer; border-radius: 10px; font-family: 'Inter', sans-serif;
+  }
+  .tab-btn-el .tab-icon { font-size: 18px; line-height: 1; }
+  .tab-btn-el.active { color: #211F1C; background: #EFEBE2; }
+  .tab-btn-el .tab-dot { position: absolute; top: 2px; right: 18%; width: 6px; height: 6px; border-radius: 50%; background: #C99A3B; }
+  .content-col { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .fab-btn { bottom: calc(84px + env(safe-area-inset-bottom)) !important; }
+
+  @media (min-width: 900px) {
+    .layout-row { display: flex; align-items: flex-start; gap: 28px; }
+    .tabs-nav {
+      position: static; flex-direction: column; width: 190px; flex-shrink: 0;
+      background: transparent; border-top: none; padding: 0; gap: 6px;
+    }
+    .tab-btn-el {
+      flex-direction: row; justify-content: flex-start; width: 100%;
+      padding: 8px 13px; border-radius: 999px; font-size: 13.5px; gap: 6px;
+    }
+    .tab-btn-el .tab-icon { font-size: 15px; }
+    .tab-btn-el.active { background: #211F1C; color: #F7F5F1; }
+    .content-col { flex: 1; min-width: 0; padding-bottom: 0; }
+    .fab-btn { bottom: calc(22px + env(safe-area-inset-bottom)) !important; }
+  }
 </style>
 </head>
 <body>
@@ -64,21 +97,7 @@ const DEFAULT_CATEGORIES = [
   { id: "altro-i", name: "Altro", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const DEFAULT_TOPICS = [
-  { id: "i1", level: "Base", kind: "Concetto", title: "Interesse composto", note: "Il meccanismo per cui i guadagni generano altri guadagni nel tempo. È la base di ogni ragionamento sugli investimenti." },
-  { id: "i2", level: "Base", kind: "Concetto", title: "Fondo di emergenza", note: "Riserva liquida (3-6 mesi di spese) da avere da parte prima di iniziare a investire." },
-  { id: "i3", level: "Base", kind: "Concetto", title: "Inflazione e potere d'acquisto", note: "Perché tenere i soldi fermi sul conto corrente li fa perdere valore nel tempo." },
-  { id: "i4", level: "Base", kind: "Libro", title: "Il piccolo libro per investire con buon senso — J. Bogle", note: "Introduzione classica agli investimenti passivi e ai fondi indicizzati." },
-  { id: "i5", level: "Intermedio", kind: "Concetto", title: "ETF e fondi indicizzati", note: "Come funzionano gli strumenti che replicano un intero mercato invece di puntare su singoli titoli." },
-  { id: "i6", level: "Intermedio", kind: "Concetto", title: "Diversificazione e rischio", note: "Perché distribuire il capitale su più asset riduce il rischio complessivo del portafoglio." },
-  { id: "i7", level: "Intermedio", kind: "Concetto", title: "Orizzonte temporale e profilo di rischio", note: "Come il tempo a disposizione cambia le scelte di investimento sensate per una persona." },
-  { id: "i8", level: "Intermedio", kind: "Concetto", title: "PAC — Piano di Accumulo del Capitale", note: "Investire piccole somme con regolarità invece che in un'unica soluzione, per mediare il prezzo d'ingresso." },
-  { id: "i9", level: "Avanzato", kind: "Concetto", title: "Asset allocation e ribilanciamento", note: "Come mantenere nel tempo le proporzioni scelte tra azionario, obbligazionario e liquidità." },
-  { id: "i10", level: "Avanzato", kind: "Concetto", title: "Fiscalità degli investimenti in Italia", note: "Tassazione delle plusvalenze, regime dichiarativo vs amministrato, bollo titoli." },
-];
-
-const LEVELS = ["Base", "Intermedio", "Avanzato"];
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.10.0";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
@@ -216,12 +235,8 @@ function App() {
   const [tab, setTab] = useState("dashboard");
   const [categories, setCategories] = useState(() => loadKey("categories", DEFAULT_CATEGORIES));
   const [transactions, setTransactions] = useState(() => loadKey("transactions", []));
-  const [topics] = useState(() => loadKey("topics", DEFAULT_TOPICS));
-  const [progress, setProgress] = useState(() => loadKey("progress", []));
-  const [resources, setResources] = useState(() => loadKey("resources", []));
   const [archives, setArchives] = useState(() => loadKey("archives", []));
   const [savings, setSavings] = useState(() => loadKey("savings", []));
-  const [notes, setNotes] = useState(() => loadKey("notes", ""));
   const [sheetUrl, setSheetUrlState] = useState(() => loadKey("sheet-url", ""));
   const [lastSync, setLastSync] = useState(() => loadKey("last-sync", ""));
   const [lastPull, setLastPull] = useState(() => loadKey("last-pull", ""));
@@ -299,7 +314,40 @@ function App() {
       }
     }
     checkSyncHealth();
-    const interval = setInterval(() => { flushQueue(); checkSyncHealth(); }, 5 * 60 * 1000); // sincronizzazione e controllo automatici ogni 5 minuti, oltre a quello immediato a ogni transazione
+    async function mergeFromSheet() {
+      const url = loadKey("sheet-url", "");
+      if (!url) return;
+      try {
+        const res = await fetch(url, { method: "GET" });
+        if (!res.ok) return;
+        const data = await res.json();
+        const localTx = loadKey("transactions", []);
+        const localIds = new Set(localTx.map(t => t.id));
+        let cats = loadKey("categories", DEFAULT_CATEGORIES);
+        const byName = {}; cats.forEach(c => { byName[c.name.trim().toLowerCase()] = c.id; });
+        function ensureCat(name, type) {
+          let id = byName[(name || "").trim().toLowerCase()];
+          if (!id) {
+            const nc = { id: uid(), name: name || "Altro", icon: "🏷️", color: "#8A8578", type: type || "expense", budget: 0 };
+            cats.push(nc); byName[nc.name.toLowerCase()] = nc.id; id = nc.id;
+          }
+          return id;
+        }
+        const archivedYears = new Set((data.archives || []).map(a => a.year));
+        const newOnes = (data.transactions || [])
+          .filter(t => !localIds.has(t.id) && !archivedYears.has(String(t.date).slice(0, 4)))
+          .map(t => ({ id: t.id, type: t.type, amount: parseFloat(t.amount) || 0, categoryId: ensureCat(t.categoryName, t.type), date: t.date, note: t.note || "", trip: t.trip || "" }));
+        if (newOnes.length > 0) {
+          const merged = [...newOnes, ...localTx];
+          setTransactions(merged); saveKey("transactions", merged);
+          setCategories(cats); saveKey("categories", cats);
+        }
+        const ts = new Date().toISOString();
+        setLastPull(ts); saveKey("last-pull", ts);
+      } catch (e) { /* prossimo giro va meglio */ }
+    }
+    mergeFromSheet();
+    const interval = setInterval(() => { flushQueue(); checkSyncHealth(); mergeFromSheet(); }, 5 * 60 * 1000); // sincronizzazione e controllo automatici ogni 5 minuti, oltre a quello immediato a ogni transazione
     return () => { window.removeEventListener("online", flushQueue); clearInterval(interval); };
   }, []); // eslint-disable-line
 
@@ -387,67 +435,13 @@ function App() {
     setSavings(next); saveKey("savings", next);
   }
   function exportBackup() {
-    const data = { app: "Registro", version: APP_VERSION, exportedAt: new Date().toISOString(), categories, transactions, archives, resources, notes, progress, savings };
+    const data = { app: "Registro", version: APP_VERSION, exportedAt: new Date().toISOString(), categories, transactions, archives, savings };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = `registro-backup-${todayISO()}.json`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }
-  async function importArchivesFile(file) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const data = JSON.parse(e.target.result);
-        if (!Array.isArray(data)) throw new Error("formato non valido");
-        let cats = [...categories];
-        const byName = {};
-        cats.forEach(c => { byName[c.name.trim().toLowerCase()] = c.id; });
-        function ensureCat(name) {
-          let id = byName[(name || "").trim().toLowerCase()];
-          if (!id) {
-            const nc = { id: uid(), name: (name || "Altro").trim(), icon: "🏷️", color: "#8A8578", type: "expense", budget: 0 };
-            cats.push(nc); byName[nc.name.toLowerCase()] = nc.id; id = nc.id;
-          }
-          return id;
-        }
-
-        let nextArchives = [...archives];
-        const importedEntries = [];
-        data.forEach(entry => {
-          if (!entry.year || !entry.categories) return;
-          const categoryTotals = {}; const categoryNames = {};
-          let totalExpense = 0;
-          Object.entries(entry.categories).forEach(([name, amount]) => {
-            const id = ensureCat(name);
-            const n = parseFloat(amount) || 0;
-            categoryTotals[id] = n; totalExpense += n;
-          });
-          cats.forEach(c => { if (categoryTotals[c.id] !== undefined) categoryNames[c.id] = { name: c.name, icon: c.icon }; });
-          const totalIncome = parseFloat(entry.income) || 0;
-          const archive = { year: String(entry.year), categoryTotals, categoryNames, totalIncome, totalExpense, saldo: totalIncome - totalExpense, closedAt: new Date().toISOString() };
-          nextArchives = [...nextArchives.filter(a => a.year !== archive.year), archive];
-          importedEntries.push(archive);
-        });
-
-        setCategories(cats); saveKey("categories", cats);
-        setArchives(nextArchives); saveKey("archives", nextArchives);
-        const remainingTx = transactions.filter(t => !importedEntries.some(a => a.year === t.date.slice(0, 4)));
-        if (remainingTx.length !== transactions.length) { setTransactions(remainingTx); saveKey("transactions", remainingTx); }
-
-        for (const a of importedEntries) {
-          const catsPayload = Object.entries(a.categoryTotals).map(([id, total]) => ({ name: a.categoryNames[id]?.name || "Altro", total }));
-          await pushToSheet({ action: "closeYear", year: a.year, categories: catsPayload });
-        }
-
-        window.alert(`Importati ${importedEntries.length} anni: ${importedEntries.map(a=>a.year).join(", ")}.`);
-      } catch (err) {
-        window.alert("Il file non sembra nel formato corretto per l'importazione delle chiusure anno.");
-      }
-    };
-    reader.readAsText(file);
   }
   function importBackupFile(file) {
     if (!file) return;
@@ -459,9 +453,6 @@ function App() {
         if (Array.isArray(data.categories)) { setCategories(data.categories); saveKey("categories", data.categories); }
         if (Array.isArray(data.transactions)) { setTransactions(data.transactions); saveKey("transactions", data.transactions); }
         if (Array.isArray(data.archives)) { setArchives(data.archives); saveKey("archives", data.archives); }
-        if (Array.isArray(data.resources)) { setResources(data.resources); saveKey("resources", data.resources); }
-        if (Array.isArray(data.progress)) { setProgress(data.progress); saveKey("progress", data.progress); }
-        if (typeof data.notes === "string") { setNotes(data.notes); saveKey("notes", data.notes); }
         if (Array.isArray(data.savings)) { setSavings(data.savings); saveKey("savings", data.savings); }
         window.alert("Ripristino completato.");
       } catch (err) {
@@ -578,23 +569,6 @@ function App() {
     const next = categories.filter(c => c.id !== id);
     setCategories(next); saveKey("categories", next);
   }
-  function toggleTopic(id) {
-    const next = progress.includes(id) ? progress.filter(p => p !== id) : [...progress, id];
-    setProgress(next); saveKey("progress", next);
-  }
-  function addResource(res) {
-    const next = [{ ...res, id: uid(), done: false }, ...resources];
-    setResources(next); saveKey("resources", next);
-  }
-  function toggleResource(id) {
-    const next = resources.map(r => r.id === id ? { ...r, done: !r.done } : r);
-    setResources(next); saveKey("resources", next);
-  }
-  function removeResource(id) {
-    const next = resources.filter(r => r.id !== id);
-    setResources(next); saveKey("resources", next);
-  }
-  function saveNotes(v) { setNotes(v); saveKey("notes", v); }
 
   const balance = transactions.reduce((s, t) => s + (t.type === "income" ? t.amount : -t.amount), 0)
     + archives.reduce((s, a) => s + (a.saldo || 0), 0);
@@ -613,15 +587,16 @@ function App() {
           </div>
         </header>
 
-        <nav style={S.tabs}>
+        <div className="layout-row">
+        <nav className="tabs-nav" style={S.tabs}>
           <TabBtn active={tab==="dashboard"} onClick={()=>setTab("dashboard")} icon="▦" label="Dashboard" />
           <TabBtn active={tab==="transazioni"} onClick={()=>setTab("transazioni")} icon="☰" label="Transazioni" />
           <TabBtn active={tab==="categorie"} onClick={()=>setTab("categorie")} icon="🏷" label="Categorie" />
-          <TabBtn active={tab==="investimenti"} onClick={()=>setTab("investimenti")} icon="📖" label="Investimenti" />
           <TabBtn active={tab==="risparmi"} onClick={()=>setTab("risparmi")} icon="🏦" label="Risparmi" />
           <TabBtn active={tab==="backup"} onClick={()=>setTab("backup")} icon="☁" label="Backup" dot={!sheetUrl || pendingCount > 0} />
         </nav>
 
+        <div className="content-col">
         <main style={S.main}>
           {autoClosedYears.length > 0 && (
             <div style={{ ...S.card, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, background: TOKENS.accentSoft, boxShadow: "none" }}>
@@ -634,13 +609,12 @@ function App() {
           )}
           {tab === "dashboard" && <Dashboard transactions={transactions} categories={categories} catMap={catMap} archives={archives} />}
           {tab === "transazioni" && <Transazioni transactions={transactions} categories={categories} catMap={catMap} onAdd={addTransaction} onRemove={removeTransaction} onUpdate={updateTransaction} existingTrips={existingTrips} />}
-          {tab === "categorie" && <Categorie categories={categories} transactions={transactions} archives={archives} onAdd={addCategory} onUpdate={updateCategory} onRemove={removeCategory} onCloseYear={closeYear} onImportArchives={importArchivesFile} />}
-          {tab === "investimenti" && <Investimenti topics={topics} progress={progress} onToggleTopic={toggleTopic} resources={resources} onAddResource={addResource} onToggleResource={toggleResource} onRemoveResource={removeResource} notes={notes} onSaveNotes={saveNotes} />}
+          {tab === "categorie" && <Categorie categories={categories} transactions={transactions} archives={archives} onAdd={addCategory} onUpdate={updateCategory} onRemove={removeCategory} onCloseYear={closeYear} />}
           {tab === "risparmi" && <Risparmi savings={savings} onAdd={addSaving} onRemove={removeSaving} />}
           {tab === "backup" && <Backup sheetUrl={sheetUrl} onSaveUrl={saveSheetUrl} lastSync={lastSync} lastPull={lastPull} syncing={syncing} pulling={pulling} onSyncAll={syncAllNow} onPull={pullFromSheet} count={transactions.length} pendingCount={pendingCount} syncFailStreak={syncFailStreak} onExport={exportBackup} onImportFile={importBackupFile} />}
         </main>
 
-        <button onClick={()=>setQuickAdd(true)} aria-label="Nuova transazione" style={S.fab}>+</button>
+        <button className="fab-btn" onClick={()=>setQuickAdd(true)} aria-label="Nuova transazione" style={S.fab}>+</button>
 
         {quickAdd && (
           <div style={S.modalOverlay} onClick={(e)=>{ if (e.target === e.currentTarget) setQuickAdd(false); }}>
@@ -655,6 +629,8 @@ function App() {
         )}
 
         <p style={S.footer}>Registro v{APP_VERSION} · vive su questo dispositivo, funziona anche offline. Collega il Backup per portare i dati anche su altri dispositivi.</p>
+        </div>
+        </div>
       </div>
     </div>
   );
@@ -670,7 +646,7 @@ const TOKENS = {
 
 const S = {
   app: { minHeight: "100vh", background: TOKENS.paper, color: TOKENS.ink, fontFamily: "'Inter', sans-serif" },
-  shell: { maxWidth: 860, margin: "0 auto", padding: "calc(22px + env(safe-area-inset-top)) 18px calc(60px + env(safe-area-inset-bottom))" },
+  shell: { maxWidth: 860, margin: "0 auto", padding: "calc(22px + env(safe-area-inset-top)) 18px 18px" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18, flexWrap: "wrap", gap: 10 },
   eyebrow: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: 2, color: TOKENS.inkSoft },
   h1: { fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 32, margin: "2px 0 0" },
@@ -682,20 +658,17 @@ const S = {
   card: { background: "#fff", borderRadius: 14, padding: 18, boxShadow: "0 1px 2px rgba(33,31,28,0.04), 0 6px 16px rgba(33,31,28,0.04)" },
   sectionTitle: { fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, margin: "0 0 12px" },
   footer: { textAlign: "center", fontSize: 11.5, color: TOKENS.inkSoft, marginTop: 30, lineHeight: 1.6 },
-  fab: { position: "fixed", bottom: "calc(22px + env(safe-area-inset-bottom))", right: 22, width: 56, height: 56, borderRadius: "50%", border: "none", background: TOKENS.ink, color: TOKENS.paper, fontSize: 28, lineHeight: "56px", textAlign: "center", padding: 0, cursor: "pointer", boxShadow: "0 4px 14px rgba(33,31,28,0.28)", zIndex: 40 },
+  fab: { position: "fixed", right: 22, width: 56, height: 56, borderRadius: "50%", border: "none", background: TOKENS.ink, color: TOKENS.paper, fontSize: 28, lineHeight: "56px", textAlign: "center", padding: 0, cursor: "pointer", boxShadow: "0 4px 14px rgba(33,31,28,0.28)", zIndex: 40 },
   modalOverlay: { position: "fixed", inset: 0, background: "rgba(33,31,28,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 50, padding: 0 },
   modalCard: { background: TOKENS.paper, borderRadius: "16px 16px 0 0", padding: "18px 18px calc(18px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 -8px 30px rgba(33,31,28,0.2)" },
 };
 
 function TabBtn({ active, onClick, icon, label, dot }) {
   return (
-    <button onClick={onClick} style={{
-      position: "relative", display: "flex", alignItems: "center", gap: 6, padding: "8px 13px", borderRadius: 999,
-      border: "none", background: active ? TOKENS.ink : TOKENS.paper2,
-      color: active ? TOKENS.paper : TOKENS.inkSoft, fontSize: 13.5, fontWeight: 500, cursor: "pointer",
-    }}>
-      <span>{icon}</span>{label}
-      {dot && <span style={{ position: "absolute", top: 5, right: 5, width: 6, height: 6, borderRadius: "50%", background: TOKENS.amber }} />}
+    <button className={`tab-btn-el${active ? " active" : ""}`} onClick={onClick}>
+      <span className="tab-icon">{icon}</span>
+      <span>{label}</span>
+      {dot && <span className="tab-dot" />}
     </button>
   );
 }
@@ -1038,11 +1011,10 @@ function TxForm({ categories, onSubmit, initial, onCancel, existingTrips = [] })
 
 /* ---------- Categorie ---------- */
 
-function Categorie({ categories, transactions, archives, onAdd, onUpdate, onRemove, onCloseYear, onImportArchives }) {
+function Categorie({ categories, transactions, archives, onAdd, onUpdate, onRemove, onCloseYear }) {
   const [showForm, setShowForm] = useState(false);
   const [confirmId, setConfirmId] = useState(null);
   const [yearToClose, setYearToClose] = useState("");
-  const archiveFileRef = useRef(null);
 
   const liveYears = useMemo(() => {
     const ys = new Set(transactions.map(t => t.date.slice(0, 4)));
@@ -1159,12 +1131,6 @@ function Categorie({ categories, transactions, archives, onAdd, onUpdate, onRemo
             </button>
           </div>
         )}
-        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${TOKENS.line}` }}>
-          <p style={{ color: TOKENS.inkSoft, fontSize: 12.5, margin: "0 0 8px" }}>Hai già dei totali di anni passati da un'altra fonte (es. Notion)? Importali direttamente, senza reinserire ogni spesa.</p>
-          <button onClick={()=>archiveFileRef.current?.click()} style={{ ...btnPrimary, background: TOKENS.paper2, color: TOKENS.ink }}><span>⬆</span> Importa chiusure da file</button>
-          <input ref={archiveFileRef} type="file" accept="application/json" style={{ display: "none" }}
-            onChange={e => { const f = e.target.files?.[0]; onImportArchives(f); e.target.value = ""; }} />
-        </div>
       </div>
     </>
   );
@@ -1201,95 +1167,6 @@ function CatForm({ onSubmit }) {
   );
 }
 
-/* ---------- Investimenti ---------- */
-
-function Investimenti({ topics, progress, onToggleTopic, resources, onAddResource, onToggleResource, onRemoveResource, notes, onSaveNotes }) {
-  const [showForm, setShowForm] = useState(false);
-  const done = topics.filter(t => progress.includes(t.id)).length;
-
-  return (
-    <>
-      <div style={S.card}>
-        <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: 1.5, color: TOKENS.amber, margin: "0 0 4px" }}>PERCORSO DI STUDIO</p>
-        <h3 style={{ ...S.sectionTitle, margin: "0 0 4px" }}>Impara a investire, un passo alla volta</h3>
-        <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, margin: "0 0 10px", lineHeight: 1.6 }}>
-          Una checklist di concetti e letture per iniziare a orientarti. Spunta ciò che hai già approfondito — {done}/{topics.length} completati.
-        </p>
-        <div style={{ height: 6, background: TOKENS.paper2, borderRadius: 99, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${(done/topics.length)*100}%`, background: TOKENS.amber, transition: "width .3s" }} />
-        </div>
-      </div>
-
-      {LEVELS.map(level => (
-        <div key={level} style={S.card}>
-          <h4 style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 600, margin: "0 0 10px" }}>{level}</h4>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {topics.filter(t => t.level === level).map(t => {
-              const isDone = progress.includes(t.id);
-              return (
-                <div key={t.id} onClick={()=>onToggleTopic(t.id)} style={{ display: "flex", gap: 10, cursor: "pointer", padding: 8, borderRadius: 8, background: isDone ? TOKENS.accentSoft : "transparent" }}>
-                  <div style={{ width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${isDone?TOKENS.accent:TOKENS.line}`, background: isDone?TOKENS.accent:"transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1, color: "#fff", fontSize: 12 }}>
-                    {isDone && "✓"}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 500, textDecoration: isDone ? "line-through" : "none", color: isDone ? TOKENS.inkSoft : TOKENS.ink }}>
-                      {t.title} <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: TOKENS.amber, fontWeight: 400 }}>· {t.kind}</span>
-                    </div>
-                    <div style={{ fontSize: 12.5, color: TOKENS.inkSoft, marginTop: 2, lineHeight: 1.5 }}>{t.note}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-
-      <div style={S.card}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={S.sectionTitle}>Le tue risorse</h3>
-          <button onClick={()=>setShowForm(s=>!s)} style={btnPrimary}><span>{showForm ? "✕" : "+"}</span> {showForm ? "Chiudi" : "Aggiungi"}</button>
-        </div>
-        {showForm && <ResourceForm onSubmit={(r)=>{ onAddResource(r); setShowForm(false); }} />}
-        {resources.length === 0 ? (
-          <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, margin: "10px 0 0" }}>Qui potrai salvare libri, articoli o video che trovi da solo man mano che studi.</p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-            {resources.map(r => (
-              <div key={r.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderTop: `1px solid ${TOKENS.line}` }}>
-                <div onClick={()=>onToggleResource(r.id)} style={{ width: 18, height: 18, marginTop: 2, borderRadius: 5, border: `1.5px solid ${r.done?TOKENS.accent:TOKENS.line}`, background: r.done?TOKENS.accent:"transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 11 }}>
-                  {r.done && "✓"}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 500, textDecoration: r.done ? "line-through" : "none" }}>{r.title}</div>
-                  {r.note && <div style={{ fontSize: 12.5, color: TOKENS.inkSoft }}>{r.note}</div>}
-                </div>
-                <button onClick={()=>onRemoveResource(r.id)} style={{ border: "none", background: "transparent", color: TOKENS.line, cursor: "pointer" }}>🗑</button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div style={S.card}>
-        <h3 style={S.sectionTitle}>Appunti</h3>
-        <textarea value={notes} onChange={e=>onSaveNotes(e.target.value)} placeholder="Scrivi qui le tue riflessioni mentre studi…" style={{ ...inputStyle, minHeight: 110, resize: "vertical", fontFamily: "Inter" }} />
-      </div>
-    </>
-  );
-}
-
-function ResourceForm({ onSubmit }) {
-  const [title, setTitle] = useState("");
-  const [note, setNote] = useState("");
-  function submit(e) { e.preventDefault(); if (!title.trim()) return; onSubmit({ title: title.trim(), note: note.trim() }); }
-  return (
-    <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${TOKENS.line}` }}>
-      <Field label="Titolo"><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="es. video su ETF di X" style={inputStyle} /></Field>
-      <Field label="Nota (opzionale)"><input value={note} onChange={e=>setNote(e.target.value)} placeholder="dove l'hai trovato, cosa ricordare" style={inputStyle} /></Field>
-      <button type="submit" style={{ ...btnPrimary, justifyContent: "center" }}><span>✓</span> Salva risorsa</button>
-    </form>
-  );
-}
 
 /* ---------- Backup su Google Sheets ---------- */
 
@@ -1320,7 +1197,7 @@ function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onS
           <h3 style={{ ...S.sectionTitle, margin: 0 }}>{sheetUrl ? "Collegato a Google Sheets" : "Non ancora collegato"}</h3>
         </div>
         <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, lineHeight: 1.6, margin: "6px 0 14px" }}>
-          Le transazioni vivono nella memoria di questo browser: se cambi telefono o computer, ripartono da zero finché non "carichi" il backup da qui. Il foglio Google è quindi sia il backup che il modo per portare i dati su un altro dispositivo.
+          Ogni transazione nuova si invia da sola quando la aggiungi, e ogni 5 minuti l'app controlla il foglio e aggiunge in automatico quelle inserite da un altro dispositivo — utile se usi telefono e computer nella stessa giornata. Modifiche ed eliminazioni fatte altrove, invece, non si propagano da sole: per quelle usa "Carica da questo foglio" qui sotto, che sostituisce tutto con l'ultima versione del foglio.
         </p>
         <Field label="URL dell'Apps Script (Web App)">
           <input value={draft} onChange={e=>setDraft(e.target.value)} placeholder="https://script.google.com/macros/s/…/exec" style={inputStyle} />

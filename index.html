@@ -78,13 +78,13 @@ const DEFAULT_TOPICS = [
 ];
 
 const LEVELS = ["Base", "Intermedio", "Avanzato"];
-const APP_VERSION = "1.4.1";
+const APP_VERSION = "1.7.0";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
   if (!sheet) {
     sheet = ss.insertSheet(year);
-    sheet.appendRow(['ID','Tipo','Importo','Categoria','Data','Nota']);
+    sheet.appendRow(['ID','Tipo','Importo','Categoria','Data','Nota','Viaggio']);
   }
   return sheet;
 }
@@ -96,7 +96,7 @@ function doPost(e) {
   if (body.action === 'append') {
     var t = body.tx;
     var sheet = getSheetForDate(ss, t.date);
-    sheet.appendRow([t.id, t.type, t.amount, t.categoryName, t.date, t.note || '']);
+    sheet.appendRow([t.id, t.type, t.amount, t.categoryName, t.date, t.note || '', t.trip || '']);
 
   } else if (body.action === 'delete') {
     ss.getSheets().forEach(function(sheet) {
@@ -117,7 +117,7 @@ function doPost(e) {
     });
     var ut = body.tx;
     var usheet = getSheetForDate(ss, ut.date);
-    usheet.appendRow([ut.id, ut.type, ut.amount, ut.categoryName, ut.date, ut.note || '']);
+    usheet.appendRow([ut.id, ut.type, ut.amount, ut.categoryName, ut.date, ut.note || '', ut.trip || '']);
 
   } else if (body.action === 'bulk') {
     var byYear = {};
@@ -131,7 +131,7 @@ function doPost(e) {
       var existing = sheet.getDataRange().getValues().slice(1).map(function(r){ return r[0]; });
       byYear[y].forEach(function(t) {
         if (existing.indexOf(t.id) === -1) {
-          sheet.appendRow([t.id, t.type, t.amount, t.categoryName, t.date, t.note || '']);
+          sheet.appendRow([t.id, t.type, t.amount, t.categoryName, t.date, t.note || '', t.trip || '']);
         }
       });
     });
@@ -164,7 +164,7 @@ function doGet(e) {
     rows.forEach(function(r) {
       var d = r[4];
       var dateStr = (d instanceof Date) ? Utilities.formatDate(d, tz, 'yyyy-MM-dd') : String(d);
-      out.transactions.push({ id: r[0], type: r[1], amount: r[2], categoryName: r[3], date: dateStr, note: r[5] || '' });
+      out.transactions.push({ id: r[0], type: r[1], amount: r[2], categoryName: r[3], date: dateStr, note: r[5] || '', trip: r[6] || '' });
     });
   });
   var arch = ss.getSheetByName('Archivio');
@@ -220,6 +220,7 @@ function App() {
   const [progress, setProgress] = useState(() => loadKey("progress", []));
   const [resources, setResources] = useState(() => loadKey("resources", []));
   const [archives, setArchives] = useState(() => loadKey("archives", []));
+  const [savings, setSavings] = useState(() => loadKey("savings", []));
   const [notes, setNotes] = useState(() => loadKey("notes", ""));
   const [sheetUrl, setSheetUrlState] = useState(() => loadKey("sheet-url", ""));
   const [lastSync, setLastSync] = useState(() => loadKey("last-sync", ""));
@@ -251,6 +252,7 @@ function App() {
   }, []); // eslint-disable-line
 
   const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c])), [categories]);
+  const existingTrips = useMemo(() => Array.from(new Set(transactions.map(t => t.trip).filter(Boolean))).sort(), [transactions]);
 
   function queueAdd(payload) {
     const q = loadKey("pending-sync", []);
@@ -376,14 +378,76 @@ function App() {
     const updated = next.find(t => t.id === id);
     pushToSheet({ action: "update", id, tx: { ...updated, categoryName: catMap[updated.categoryId]?.name || updated.categoryId } });
   }
+  function addSaving(entry) {
+    const next = [{ ...entry, id: uid() }, ...savings];
+    setSavings(next); saveKey("savings", next);
+  }
+  function removeSaving(id) {
+    const next = savings.filter(s => s.id !== id);
+    setSavings(next); saveKey("savings", next);
+  }
   function exportBackup() {
-    const data = { app: "Registro", version: APP_VERSION, exportedAt: new Date().toISOString(), categories, transactions, archives, resources, notes, progress };
+    const data = { app: "Registro", version: APP_VERSION, exportedAt: new Date().toISOString(), categories, transactions, archives, resources, notes, progress, savings };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = `registro-backup-${todayISO()}.json`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+  async function importArchivesFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!Array.isArray(data)) throw new Error("formato non valido");
+        let cats = [...categories];
+        const byName = {};
+        cats.forEach(c => { byName[c.name.trim().toLowerCase()] = c.id; });
+        function ensureCat(name) {
+          let id = byName[(name || "").trim().toLowerCase()];
+          if (!id) {
+            const nc = { id: uid(), name: (name || "Altro").trim(), icon: "🏷️", color: "#8A8578", type: "expense", budget: 0 };
+            cats.push(nc); byName[nc.name.toLowerCase()] = nc.id; id = nc.id;
+          }
+          return id;
+        }
+
+        let nextArchives = [...archives];
+        const importedEntries = [];
+        data.forEach(entry => {
+          if (!entry.year || !entry.categories) return;
+          const categoryTotals = {}; const categoryNames = {};
+          let totalExpense = 0;
+          Object.entries(entry.categories).forEach(([name, amount]) => {
+            const id = ensureCat(name);
+            const n = parseFloat(amount) || 0;
+            categoryTotals[id] = n; totalExpense += n;
+          });
+          cats.forEach(c => { if (categoryTotals[c.id] !== undefined) categoryNames[c.id] = { name: c.name, icon: c.icon }; });
+          const totalIncome = parseFloat(entry.income) || 0;
+          const archive = { year: String(entry.year), categoryTotals, categoryNames, totalIncome, totalExpense, saldo: totalIncome - totalExpense, closedAt: new Date().toISOString() };
+          nextArchives = [...nextArchives.filter(a => a.year !== archive.year), archive];
+          importedEntries.push(archive);
+        });
+
+        setCategories(cats); saveKey("categories", cats);
+        setArchives(nextArchives); saveKey("archives", nextArchives);
+        const remainingTx = transactions.filter(t => !importedEntries.some(a => a.year === t.date.slice(0, 4)));
+        if (remainingTx.length !== transactions.length) { setTransactions(remainingTx); saveKey("transactions", remainingTx); }
+
+        for (const a of importedEntries) {
+          const catsPayload = Object.entries(a.categoryTotals).map(([id, total]) => ({ name: a.categoryNames[id]?.name || "Altro", total }));
+          await pushToSheet({ action: "closeYear", year: a.year, categories: catsPayload });
+        }
+
+        window.alert(`Importati ${importedEntries.length} anni: ${importedEntries.map(a=>a.year).join(", ")}.`);
+      } catch (err) {
+        window.alert("Il file non sembra nel formato corretto per l'importazione delle chiusure anno.");
+      }
+    };
+    reader.readAsText(file);
   }
   function importBackupFile(file) {
     if (!file) return;
@@ -398,6 +462,7 @@ function App() {
         if (Array.isArray(data.resources)) { setResources(data.resources); saveKey("resources", data.resources); }
         if (Array.isArray(data.progress)) { setProgress(data.progress); saveKey("progress", data.progress); }
         if (typeof data.notes === "string") { setNotes(data.notes); saveKey("notes", data.notes); }
+        if (Array.isArray(data.savings)) { setSavings(data.savings); saveKey("savings", data.savings); }
         window.alert("Ripristino completato.");
       } catch (err) {
         window.alert("Il file non sembra un backup valido di Registro.");
@@ -432,7 +497,7 @@ function App() {
       const archivedYears = new Set((data.archives || []).map(a => a.year));
       const mapped = (data.transactions || [])
         .filter(t => !archivedYears.has(String(t.date).slice(0, 4)))
-        .map(t => ({ id: t.id, type: t.type, amount: parseFloat(t.amount) || 0, categoryId: ensureCat(t.categoryName, t.type), date: t.date, note: t.note || "" }));
+        .map(t => ({ id: t.id, type: t.type, amount: parseFloat(t.amount) || 0, categoryId: ensureCat(t.categoryName, t.type), date: t.date, note: t.note || "", trip: t.trip || "" }));
       const mappedArchives = (data.archives || []).map(a => {
         const categoryTotals = {};
         const categoryNames = {};
@@ -553,6 +618,7 @@ function App() {
           <TabBtn active={tab==="transazioni"} onClick={()=>setTab("transazioni")} icon="☰" label="Transazioni" />
           <TabBtn active={tab==="categorie"} onClick={()=>setTab("categorie")} icon="🏷" label="Categorie" />
           <TabBtn active={tab==="investimenti"} onClick={()=>setTab("investimenti")} icon="📖" label="Investimenti" />
+          <TabBtn active={tab==="risparmi"} onClick={()=>setTab("risparmi")} icon="🏦" label="Risparmi" />
           <TabBtn active={tab==="backup"} onClick={()=>setTab("backup")} icon="☁" label="Backup" dot={!sheetUrl || pendingCount > 0} />
         </nav>
 
@@ -567,9 +633,10 @@ function App() {
             </div>
           )}
           {tab === "dashboard" && <Dashboard transactions={transactions} categories={categories} catMap={catMap} archives={archives} />}
-          {tab === "transazioni" && <Transazioni transactions={transactions} categories={categories} catMap={catMap} onAdd={addTransaction} onRemove={removeTransaction} onUpdate={updateTransaction} />}
-          {tab === "categorie" && <Categorie categories={categories} transactions={transactions} archives={archives} onAdd={addCategory} onUpdate={updateCategory} onRemove={removeCategory} onCloseYear={closeYear} />}
+          {tab === "transazioni" && <Transazioni transactions={transactions} categories={categories} catMap={catMap} onAdd={addTransaction} onRemove={removeTransaction} onUpdate={updateTransaction} existingTrips={existingTrips} />}
+          {tab === "categorie" && <Categorie categories={categories} transactions={transactions} archives={archives} onAdd={addCategory} onUpdate={updateCategory} onRemove={removeCategory} onCloseYear={closeYear} onImportArchives={importArchivesFile} />}
           {tab === "investimenti" && <Investimenti topics={topics} progress={progress} onToggleTopic={toggleTopic} resources={resources} onAddResource={addResource} onToggleResource={toggleResource} onRemoveResource={removeResource} notes={notes} onSaveNotes={saveNotes} />}
+          {tab === "risparmi" && <Risparmi savings={savings} onAdd={addSaving} onRemove={removeSaving} />}
           {tab === "backup" && <Backup sheetUrl={sheetUrl} onSaveUrl={saveSheetUrl} lastSync={lastSync} lastPull={lastPull} syncing={syncing} pulling={pulling} onSyncAll={syncAllNow} onPull={pullFromSheet} count={transactions.length} pendingCount={pendingCount} syncFailStreak={syncFailStreak} onExport={exportBackup} onImportFile={importBackupFile} />}
         </main>
 
@@ -582,7 +649,7 @@ function App() {
                 <h3 style={{ ...S.sectionTitle, margin: 0 }}>Nuova transazione</h3>
                 <button onClick={()=>setQuickAdd(false)} style={{ border: "none", background: "transparent", color: TOKENS.inkSoft, cursor: "pointer", fontSize: 18, padding: 4 }}>✕</button>
               </div>
-              <TxForm categories={categories} onSubmit={(tx)=>{ addTransaction(tx); setQuickAdd(false); }} />
+              <TxForm categories={categories} existingTrips={existingTrips} onSubmit={(tx)=>{ addTransaction(tx); setQuickAdd(false); }} />
             </div>
           </div>
         )}
@@ -603,7 +670,7 @@ const TOKENS = {
 
 const S = {
   app: { minHeight: "100vh", background: TOKENS.paper, color: TOKENS.ink, fontFamily: "'Inter', sans-serif" },
-  shell: { maxWidth: 860, margin: "0 auto", padding: "22px 18px 60px" },
+  shell: { maxWidth: 860, margin: "0 auto", padding: "calc(22px + env(safe-area-inset-top)) 18px calc(60px + env(safe-area-inset-bottom))" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18, flexWrap: "wrap", gap: 10 },
   eyebrow: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: 2, color: TOKENS.inkSoft },
   h1: { fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 32, margin: "2px 0 0" },
@@ -823,12 +890,13 @@ function LegendDot({ color, label }) {
 
 /* ---------- Transazioni ---------- */
 
-function Transazioni({ transactions, categories, catMap, onAdd, onRemove, onUpdate }) {
+function Transazioni({ transactions, categories, catMap, onAdd, onRemove, onUpdate, existingTrips }) {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
   const [filterType, setFilterType] = useState("all");
   const [filterCat, setFilterCat] = useState("all");
+  const [filterTrip, setFilterTrip] = useState("all");
   const [search, setSearch] = useState("");
 
   const editingTx = editingId ? transactions.find(t => t.id === editingId) : null;
@@ -836,8 +904,11 @@ function Transazioni({ transactions, categories, catMap, onAdd, onRemove, onUpda
   const filtered = transactions.filter(t =>
     (filterType === "all" || t.type === filterType) &&
     (filterCat === "all" || t.categoryId === filterCat) &&
+    (filterTrip === "all" || t.trip === filterTrip) &&
     (search.trim() === "" || (t.note || "").toLowerCase().includes(search.trim().toLowerCase()))
   );
+
+  const tripTotal = filterTrip !== "all" ? filtered.reduce((s, t) => s + (t.type === "income" ? t.amount : -t.amount), 0) : null;
 
   return (
     <>
@@ -848,6 +919,12 @@ function Transazioni({ transactions, categories, catMap, onAdd, onRemove, onUpda
             <option value="all">Tutte le categorie</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
           </select>
+          {existingTrips.length > 0 && (
+            <select value={filterTrip} onChange={e=>setFilterTrip(e.target.value)} style={pillSelectStyle}>
+              <option value="all">Tutti i viaggi</option>
+              {existingTrips.map(t => <option key={t} value={t}>✈️ {t}</option>)}
+            </select>
+          )}
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cerca nelle note…" style={{ ...pillSelectStyle, flex: 1, minWidth: 120 }} />
         </div>
         <button onClick={()=>{ setShowForm(s=>!s); setEditingId(null); }} style={btnPrimary}>
@@ -855,8 +932,15 @@ function Transazioni({ transactions, categories, catMap, onAdd, onRemove, onUpda
         </button>
       </div>
 
-      {showForm && <TxForm categories={categories} onSubmit={(tx)=>{ onAdd(tx); setShowForm(false); }} />}
-      {editingTx && <TxForm categories={categories} initial={editingTx} onSubmit={(patch)=>{ onUpdate(editingTx.id, patch); setEditingId(null); }} onCancel={()=>setEditingId(null)} />}
+      {tripTotal !== null && (
+        <div style={{ ...S.card, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 13.5 }}>✈️ Totale "{filterTrip}"</span>
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 600, color: tripTotal >= 0 ? TOKENS.accent : TOKENS.negative }}>{eur(tripTotal)}</span>
+        </div>
+      )}
+
+      {showForm && <TxForm categories={categories} existingTrips={existingTrips} onSubmit={(tx)=>{ onAdd(tx); setShowForm(false); }} />}
+      {editingTx && <TxForm categories={categories} existingTrips={existingTrips} initial={editingTx} onSubmit={(patch)=>{ onUpdate(editingTx.id, patch); setEditingId(null); }} onCancel={()=>setEditingId(null)} />}
 
       <div style={{ ...S.card, padding: 0, overflow: "hidden" }}>
         {filtered.length === 0 ? (
@@ -867,7 +951,10 @@ function Transazioni({ transactions, categories, catMap, onAdd, onRemove, onUpda
             <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: i === filtered.length-1 ? "none" : `1px solid ${TOKENS.line}` }}>
               <div style={{ width: 34, height: 34, borderRadius: 8, background: (c?.color||"#999")+"22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{c?.icon || "•"}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 500 }}>{c?.name || "Senza categoria"}</div>
+                <div style={{ fontSize: 14, fontWeight: 500, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  {c?.name || "Senza categoria"}
+                  {t.trip && <span style={{ fontSize: 10.5, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.amber, background: TOKENS.amberSoft, padding: "1px 6px", borderRadius: 999 }}>✈️ {t.trip}</span>}
+                </div>
                 <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
                   {new Date(t.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
                   {t.note ? ` · ${t.note}` : ""}
@@ -892,12 +979,13 @@ function Transazioni({ transactions, categories, catMap, onAdd, onRemove, onUpda
   );
 }
 
-function TxForm({ categories, onSubmit, initial, onCancel }) {
+function TxForm({ categories, onSubmit, initial, onCancel, existingTrips = [] }) {
   const [type, setType] = useState(initial?.type || "expense");
   const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
   const [categoryId, setCategoryId] = useState(initial?.categoryId || (categories.find(c => c.type === (initial?.type || "expense"))?.id || ""));
   const [date, setDate] = useState(initial?.date || todayISO());
   const [note, setNote] = useState(initial?.note || "");
+  const [trip, setTrip] = useState(initial?.trip || "");
   const opts = categories.filter(c => c.type === type);
   const firstRun = useRef(true);
 
@@ -910,7 +998,7 @@ function TxForm({ categories, onSubmit, initial, onCancel }) {
     e.preventDefault();
     const n = parseFloat(String(amount).replace(",", "."));
     if (!n || n <= 0 || !categoryId) return;
-    onSubmit({ type, amount: n, categoryId, date, note: note.trim() });
+    onSubmit({ type, amount: n, categoryId, date, note: note.trim(), trip: trip.trim() });
   }
 
   return (
@@ -934,6 +1022,12 @@ function TxForm({ categories, onSubmit, initial, onCancel }) {
         </select>
       </Field>
       <Field label="Nota (opzionale)"><input value={note} onChange={e=>setNote(e.target.value)} placeholder="es. cena con amici" style={inputStyle} /></Field>
+      <Field label="Viaggio (opzionale)">
+        <input value={trip} onChange={e=>setTrip(e.target.value)} placeholder="es. Grecia 2026" list="trip-tags-list" style={inputStyle} />
+        <datalist id="trip-tags-list">
+          {existingTrips.map(t => <option key={t} value={t} />)}
+        </datalist>
+      </Field>
       <div style={{ display: "flex", gap: 8 }}>
         <button type="submit" style={{ ...btnPrimary, justifyContent: "center", flex: 1 }}><span>✓</span> {initial ? "Salva modifiche" : "Salva transazione"}</button>
         {initial && <button type="button" onClick={onCancel} style={{ ...btnPrimary, background: TOKENS.paper2, color: TOKENS.ink }}>Annulla</button>}
@@ -944,10 +1038,11 @@ function TxForm({ categories, onSubmit, initial, onCancel }) {
 
 /* ---------- Categorie ---------- */
 
-function Categorie({ categories, transactions, archives, onAdd, onUpdate, onRemove, onCloseYear }) {
+function Categorie({ categories, transactions, archives, onAdd, onUpdate, onRemove, onCloseYear, onImportArchives }) {
   const [showForm, setShowForm] = useState(false);
   const [confirmId, setConfirmId] = useState(null);
   const [yearToClose, setYearToClose] = useState("");
+  const archiveFileRef = useRef(null);
 
   const liveYears = useMemo(() => {
     const ys = new Set(transactions.map(t => t.date.slice(0, 4)));
@@ -1064,6 +1159,12 @@ function Categorie({ categories, transactions, archives, onAdd, onUpdate, onRemo
             </button>
           </div>
         )}
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${TOKENS.line}` }}>
+          <p style={{ color: TOKENS.inkSoft, fontSize: 12.5, margin: "0 0 8px" }}>Hai già dei totali di anni passati da un'altra fonte (es. Notion)? Importali direttamente, senza reinserire ogni spesa.</p>
+          <button onClick={()=>archiveFileRef.current?.click()} style={{ ...btnPrimary, background: TOKENS.paper2, color: TOKENS.ink }}><span>⬆</span> Importa chiusure da file</button>
+          <input ref={archiveFileRef} type="file" accept="application/json" style={{ display: "none" }}
+            onChange={e => { const f = e.target.files?.[0]; onImportArchives(f); e.target.value = ""; }} />
+        </div>
       </div>
     </>
   );
@@ -1295,6 +1396,122 @@ function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onS
         )}
       </div>
     </>
+  );
+}
+
+/* ---------- Risparmi ---------- */
+
+function Risparmi({ savings, onAdd, onRemove }) {
+  const [showForm, setShowForm] = useState(false);
+  const [confirmId, setConfirmId] = useState(null);
+
+  const total = savings.reduce((s, m) => s + (m.type === "prelievo" ? -m.amount : m.amount), 0);
+
+  const sorted = useMemo(() => [...savings].sort((a, b) => a.date.localeCompare(b.date)), [savings]);
+  const chartData = useMemo(() => {
+    let running = 0;
+    return sorted.map(m => {
+      running += m.type === "prelievo" ? -m.amount : m.amount;
+      return { date: m.date, label: new Date(m.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }), value: +running.toFixed(2) };
+    });
+  }, [sorted]);
+
+  return (
+    <>
+      <div style={S.card}>
+        <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: 1.5, color: TOKENS.amber, margin: "0 0 4px" }}>RISPARMI</p>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 600, color: TOKENS.accent }}>{eur(total)}</div>
+        <p style={{ color: TOKENS.inkSoft, fontSize: 12.5, margin: "4px 0 0", lineHeight: 1.5 }}>
+          Aggiornato a mano — utile per arrotondamenti, interessi o versamenti su un fondo separato (es. il "salvadanaio" di un conto), tenuto distinto dalle spese normali.
+        </p>
+      </div>
+
+      {chartData.length >= 2 && (
+        <div style={S.card}>
+          <h3 style={S.sectionTitle}>Andamento</h3>
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gSav" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={TOKENS.accent} stopOpacity={0.35}/>
+                  <stop offset="95%" stopColor={TOKENS.accent} stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke={TOKENS.line} vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={{ stroke: TOKENS.line }} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={false} tickLine={false} width={46} />
+              <Tooltip formatter={(v) => eur(v)} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8 }} />
+              <Area type="monotone" dataKey="value" stroke={TOKENS.accent} fill="url(#gSav)" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button onClick={()=>setShowForm(s=>!s)} style={btnPrimary}><span>{showForm ? "✕" : "+"}</span> {showForm ? "Chiudi" : "Nuovo movimento"}</button>
+      </div>
+
+      {showForm && <SavingForm onSubmit={(m)=>{ onAdd(m); setShowForm(false); }} />}
+
+      <div style={{ ...S.card, padding: 0, overflow: "hidden" }}>
+        {savings.length === 0 ? (
+          <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, padding: 18, margin: 0 }}>Nessun movimento ancora. Aggiungi il primo con "Nuovo movimento".</p>
+        ) : [...savings].sort((a,b) => b.date.localeCompare(a.date)).map((m, i, arr) => (
+          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: i === arr.length-1 ? "none" : `1px solid ${TOKENS.line}` }}>
+            <div style={{ width: 34, height: 34, borderRadius: 8, background: (m.type === "prelievo" ? TOKENS.negative : TOKENS.accent)+"22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
+              {m.type === "prelievo" ? "↘" : "🏦"}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>{m.note || (m.type === "prelievo" ? "Prelievo" : "Versamento")}</div>
+              <div style={{ fontSize: 12, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
+                {new Date(m.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
+              </div>
+            </div>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, fontSize: 14.5, color: m.type === "prelievo" ? TOKENS.negative : TOKENS.accent, whiteSpace: "nowrap" }}>
+              {m.type === "prelievo" ? "−" : "+"}{eur(m.amount)}
+            </div>
+            <button onClick={() => confirmId === m.id ? (onRemove(m.id), setConfirmId(null)) : setConfirmId(m.id)}
+              style={{ border: "none", background: confirmId === m.id ? TOKENS.negative : "transparent", color: confirmId === m.id ? "#fff" : TOKENS.inkSoft, borderRadius: 6, padding: "6px 8px", cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+              <span>🗑</span>{confirmId === m.id ? "conferma" : ""}
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function SavingForm({ onSubmit }) {
+  const [type, setType] = useState("versamento");
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState(todayISO());
+  const [note, setNote] = useState("");
+
+  function submit(e) {
+    e.preventDefault();
+    const n = parseFloat(String(amount).replace(",", "."));
+    if (!n || n <= 0) return;
+    onSubmit({ type, amount: n, date, note: note.trim() });
+  }
+
+  return (
+    <form onSubmit={submit} style={{ ...S.card, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", gap: 6 }}>
+        {[["versamento","Versamento"],["prelievo","Prelievo"]].map(([v,l]) => (
+          <button type="button" key={v} onClick={()=>setType(v)} style={{
+            flex: 1, padding: "9px 0", borderRadius: 8, cursor: "pointer", fontSize: 13.5, fontWeight: 500, border: "none",
+            background: type===v ? (v==="versamento"?TOKENS.accentSoft:TOKENS.negativeSoft) : TOKENS.paper2,
+            color: type===v ? (v==="versamento"?TOKENS.accent:TOKENS.negative) : TOKENS.inkSoft,
+          }}>{l}</button>
+        ))}
+      </div>
+      <div className="grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <Field label="Importo (€)"><input required type="number" step="0.01" min="0" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00" style={inputStyle} /></Field>
+        <Field label="Data"><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inputStyle} /></Field>
+      </div>
+      <Field label="Nota (opzionale)"><input value={note} onChange={e=>setNote(e.target.value)} placeholder="es. arrotondamenti, interessi" style={inputStyle} /></Field>
+      <button type="submit" style={{ ...btnPrimary, justifyContent: "center" }}><span>✓</span> Salva movimento</button>
+    </form>
   );
 }
 

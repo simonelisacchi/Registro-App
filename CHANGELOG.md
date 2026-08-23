@@ -1,5 +1,10 @@
 # Changelog — Registro
 
+## v1.3.0
+- **Tasto rapido**: pulsante flottante "+" sempre visibile (anche in Dashboard) per aggiungere una transazione senza cambiare scheda.
+- **Risolto lo zoom automatico su iPhone**: Safari ingrandisce da solo la pagina quando tocchi un campo con testo sotto i 16px — tutti i campi dell'app sono stati portati a 16px, quindi non serve più fare pinch per tornare alla dimensione normale dopo aver scritto.
+- **Sincronizzazione periodica**: oltre all'invio immediato ad ogni transazione, ogni 5 minuti l'app riprova automaticamente a inviare qualunque cosa fosse rimasta in sospeso (es. per mancanza di rete), senza bisogno di riaprire l'app.
+
 ## v1.2.3 — correzione seria
 - **Trovata la vera causa dello schermo bianco**, confermata guardando dal vivo la console del tuo browser: (1) Babel, la libreria che traduce il codice, era rilasciata "senza numero di versione" e ha silenziosamente ricevuto un aggiornamento importante (versione 8) incompatibile con l'app; (2) il servizio da cui scaricavo le librerie (unpkg) stava rispondendo con errori temporanei proprio sul pacchetto dei grafici.
 - **Cambiato fornitore delle librerie esterne**: da unpkg a jsDelivr, più stabile.

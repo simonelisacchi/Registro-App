@@ -38,7 +38,7 @@
 <div id="root"></div>
 <script type="text/babel" data-presets="react">
 
-const { useState, useEffect, useMemo } = React;
+const { useState, useEffect, useMemo, useRef } = React;
 const { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell } = Recharts;
 
 /* ---------- dati di partenza ---------- */
@@ -58,6 +58,7 @@ const DEFAULT_CATEGORIES = [
   { id: "telefono", name: "Telefono", icon: "📞", color: "#B4472F", type: "expense", budget: 0 },
   { id: "uni", name: "Università", icon: "📝", color: "#6B6862", type: "expense", budget: 0 },
   { id: "altro-e", name: "Altro", icon: "➕", color: "#8A8578", type: "expense", budget: 0 },
+  { id: "cloud", name: "Cloud", icon: "☁️", color: "#3B6FA8", type: "expense", budget: 0 },
   { id: "stipendio", name: "Stipendio", icon: "💼", color: "#2F6F5E", type: "income" },
   { id: "regali", name: "Regali", icon: "🎁", color: "#BE5A83", type: "income" },
   { id: "altro-i", name: "Altro", icon: "➕", color: "#2F6F5E", type: "income" },
@@ -77,7 +78,7 @@ const DEFAULT_TOPICS = [
 ];
 
 const LEVELS = ["Base", "Intermedio", "Avanzato"];
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.4.0";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
@@ -105,6 +106,18 @@ function doPost(e) {
         if (data[i][0] === body.id) { sheet.deleteRow(i + 1); break; }
       }
     });
+
+  } else if (body.action === 'update') {
+    ss.getSheets().forEach(function(sheet) {
+      if (!/^\\d{4}$/.test(sheet.getName())) return;
+      var data = sheet.getDataRange().getValues();
+      for (var i = data.length - 1; i >= 1; i--) {
+        if (data[i][0] === body.id) { sheet.deleteRow(i + 1); break; }
+      }
+    });
+    var ut = body.tx;
+    var usheet = getSheetForDate(ss, ut.date);
+    usheet.appendRow([ut.id, ut.type, ut.amount, ut.categoryName, ut.date, ut.note || '']);
 
   } else if (body.action === 'bulk') {
     var byYear = {};
@@ -215,7 +228,27 @@ function App() {
   const [pulling, setPulling] = useState(false);
   const [autoClosedYears, setAutoClosedYears] = useState([]);
   const [pendingCount, setPendingCount] = useState(() => loadKey("pending-sync", []).length);
-  const [quickAdd, setQuickAdd] = useState(false);
+  const [syncFailStreak, setSyncFailStreak] = useState(() => loadKey("sync-fail-streak", 0));
+  const [quickAdd, setQuickAdd] = useState(() => new URLSearchParams(window.location.search).get("add") === "1");
+
+  // Aggiunge la categoria "Cloud" anche a chi ha già dei dati salvati: i DEFAULT_CATEGORIES
+  // valgono solo per le installazioni nuove, quindi qui la inseriamo una volta sola se manca.
+  useEffect(() => {
+    setCategories(prev => {
+      if (prev.some(c => c.name.toLowerCase() === "cloud")) return prev;
+      const next = [...prev, { id: uid(), name: "Cloud", icon: "☁️", color: "#3B6FA8", type: "expense", budget: 0 }];
+      saveKey("categories", next);
+      return next;
+    });
+  }, []); // eslint-disable-line
+
+  useEffect(() => {
+    if (quickAdd) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("add");
+      window.history.replaceState({}, "", url);
+    }
+  }, []); // eslint-disable-line
 
   const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c])), [categories]);
 
@@ -250,7 +283,21 @@ function App() {
     }
     flushQueue();
     window.addEventListener("online", flushQueue);
-    const interval = setInterval(flushQueue, 5 * 60 * 1000); // sincronizzazione automatica ogni 5 minuti, oltre a quella immediata a ogni transazione
+    async function checkSyncHealth() {
+      const url = loadKey("sheet-url", "");
+      if (!url) return;
+      try {
+        const res = await fetch(url, { method: "GET" });
+        if (!res.ok) throw new Error("bad status");
+        await res.json();
+        saveKey("sync-fail-streak", 0); setSyncFailStreak(0);
+      } catch (e) {
+        const streak = loadKey("sync-fail-streak", 0) + 1;
+        saveKey("sync-fail-streak", streak); setSyncFailStreak(streak);
+      }
+    }
+    checkSyncHealth();
+    const interval = setInterval(() => { flushQueue(); checkSyncHealth(); }, 5 * 60 * 1000); // sincronizzazione e controllo automatici ogni 5 minuti, oltre a quello immediato a ogni transazione
     return () => { window.removeEventListener("online", flushQueue); clearInterval(interval); };
   }, []); // eslint-disable-line
 
@@ -322,6 +369,41 @@ function App() {
     const next = transactions.filter(t => t.id !== id);
     setTransactions(next); saveKey("transactions", next);
     pushToSheet({ action: "delete", id });
+  }
+  function updateTransaction(id, patch) {
+    const next = transactions.map(t => t.id === id ? { ...t, ...patch } : t);
+    setTransactions(next); saveKey("transactions", next);
+    const updated = next.find(t => t.id === id);
+    pushToSheet({ action: "update", id, tx: { ...updated, categoryName: catMap[updated.categoryId]?.name || updated.categoryId } });
+  }
+  function exportBackup() {
+    const data = { app: "Registro", version: APP_VERSION, exportedAt: new Date().toISOString(), categories, transactions, archives, resources, notes, progress };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `registro-backup-${todayISO()}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function importBackupFile(file) {
+    if (!file) return;
+    if (!window.confirm("Questo sostituirà tutti i dati attuali su questo dispositivo con quelli del file. Continuare?")) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (Array.isArray(data.categories)) { setCategories(data.categories); saveKey("categories", data.categories); }
+        if (Array.isArray(data.transactions)) { setTransactions(data.transactions); saveKey("transactions", data.transactions); }
+        if (Array.isArray(data.archives)) { setArchives(data.archives); saveKey("archives", data.archives); }
+        if (Array.isArray(data.resources)) { setResources(data.resources); saveKey("resources", data.resources); }
+        if (Array.isArray(data.progress)) { setProgress(data.progress); saveKey("progress", data.progress); }
+        if (typeof data.notes === "string") { setNotes(data.notes); saveKey("notes", data.notes); }
+        window.alert("Ripristino completato.");
+      } catch (err) {
+        window.alert("Il file non sembra un backup valido di Registro.");
+      }
+    };
+    reader.readAsText(file);
   }
   async function syncAllNow() {
     if (!sheetUrl) return;
@@ -410,6 +492,24 @@ function App() {
     setCategories(next); saveKey("categories", next);
   }
   function removeCategory(id) {
+    const cat = categories.find(c => c.id === id);
+    if (!cat) return;
+    const affected = transactions.filter(t => t.categoryId === id);
+    if (affected.length > 0) {
+      const proceed = window.confirm(`Ci sono ${affected.length} transazioni con la categoria "${cat.name}". Verranno spostate su "Altro" prima di eliminarla, per non alterare i totali già calcolati. Continuare?`);
+      if (!proceed) return;
+      let altro = categories.find(c => c.type === cat.type && c.name.trim().toLowerCase() === "altro");
+      let nextCats = categories;
+      if (!altro) {
+        altro = { id: uid(), name: "Altro", icon: "➕", color: "#8A8578", type: cat.type, budget: 0 };
+        nextCats = [...categories, altro];
+      }
+      const nextTx = transactions.map(t => t.categoryId === id ? { ...t, categoryId: altro.id } : t);
+      setTransactions(nextTx); saveKey("transactions", nextTx);
+      const finalCats = nextCats.filter(c => c.id !== id);
+      setCategories(finalCats); saveKey("categories", finalCats);
+      return;
+    }
     const next = categories.filter(c => c.id !== id);
     setCategories(next); saveKey("categories", next);
   }
@@ -467,10 +567,10 @@ function App() {
             </div>
           )}
           {tab === "dashboard" && <Dashboard transactions={transactions} categories={categories} catMap={catMap} archives={archives} />}
-          {tab === "transazioni" && <Transazioni transactions={transactions} categories={categories} catMap={catMap} onAdd={addTransaction} onRemove={removeTransaction} />}
+          {tab === "transazioni" && <Transazioni transactions={transactions} categories={categories} catMap={catMap} onAdd={addTransaction} onRemove={removeTransaction} onUpdate={updateTransaction} />}
           {tab === "categorie" && <Categorie categories={categories} transactions={transactions} archives={archives} onAdd={addCategory} onUpdate={updateCategory} onRemove={removeCategory} onCloseYear={closeYear} />}
           {tab === "investimenti" && <Investimenti topics={topics} progress={progress} onToggleTopic={toggleTopic} resources={resources} onAddResource={addResource} onToggleResource={toggleResource} onRemoveResource={removeResource} notes={notes} onSaveNotes={saveNotes} />}
-          {tab === "backup" && <Backup sheetUrl={sheetUrl} onSaveUrl={saveSheetUrl} lastSync={lastSync} lastPull={lastPull} syncing={syncing} pulling={pulling} onSyncAll={syncAllNow} onPull={pullFromSheet} count={transactions.length} pendingCount={pendingCount} />}
+          {tab === "backup" && <Backup sheetUrl={sheetUrl} onSaveUrl={saveSheetUrl} lastSync={lastSync} lastPull={lastPull} syncing={syncing} pulling={pulling} onSyncAll={syncAllNow} onPull={pullFromSheet} count={transactions.length} pendingCount={pendingCount} syncFailStreak={syncFailStreak} onExport={exportBackup} onImportFile={importBackupFile} />}
         </main>
 
         <button onClick={()=>setQuickAdd(true)} aria-label="Nuova transazione" style={S.fab}>+</button>
@@ -515,9 +615,9 @@ const S = {
   card: { background: "#fff", borderRadius: 14, padding: 18, boxShadow: "0 1px 2px rgba(33,31,28,0.04), 0 6px 16px rgba(33,31,28,0.04)" },
   sectionTitle: { fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, margin: "0 0 12px" },
   footer: { textAlign: "center", fontSize: 11.5, color: TOKENS.inkSoft, marginTop: 30, lineHeight: 1.6 },
-  fab: { position: "fixed", bottom: 22, right: 22, width: 56, height: 56, borderRadius: "50%", border: "none", background: TOKENS.ink, color: TOKENS.paper, fontSize: 28, lineHeight: "56px", textAlign: "center", padding: 0, cursor: "pointer", boxShadow: "0 4px 14px rgba(33,31,28,0.28)", zIndex: 40 },
+  fab: { position: "fixed", bottom: "calc(22px + env(safe-area-inset-bottom))", right: 22, width: 56, height: 56, borderRadius: "50%", border: "none", background: TOKENS.ink, color: TOKENS.paper, fontSize: 28, lineHeight: "56px", textAlign: "center", padding: 0, cursor: "pointer", boxShadow: "0 4px 14px rgba(33,31,28,0.28)", zIndex: 40 },
   modalOverlay: { position: "fixed", inset: 0, background: "rgba(33,31,28,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 50, padding: 0 },
-  modalCard: { background: TOKENS.paper, borderRadius: "16px 16px 0 0", padding: 18, width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 -8px 30px rgba(33,31,28,0.2)" },
+  modalCard: { background: TOKENS.paper, borderRadius: "16px 16px 0 0", padding: "18px 18px calc(18px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 -8px 30px rgba(33,31,28,0.2)" },
 };
 
 function TabBtn({ active, onClick, icon, label, dot }) {
@@ -723,33 +823,40 @@ function LegendDot({ color, label }) {
 
 /* ---------- Transazioni ---------- */
 
-function Transazioni({ transactions, categories, catMap, onAdd, onRemove }) {
+function Transazioni({ transactions, categories, catMap, onAdd, onRemove, onUpdate }) {
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
   const [filterType, setFilterType] = useState("all");
   const [filterCat, setFilterCat] = useState("all");
+  const [search, setSearch] = useState("");
+
+  const editingTx = editingId ? transactions.find(t => t.id === editingId) : null;
 
   const filtered = transactions.filter(t =>
     (filterType === "all" || t.type === filterType) &&
-    (filterCat === "all" || t.categoryId === filterCat)
+    (filterCat === "all" || t.categoryId === filterCat) &&
+    (search.trim() === "" || (t.note || "").toLowerCase().includes(search.trim().toLowerCase()))
   );
 
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
           <SelectPill value={filterType} onChange={setFilterType} options={[["all","Tutte"],["income","Entrate"],["expense","Uscite"]]} />
           <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={pillSelectStyle}>
             <option value="all">Tutte le categorie</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
           </select>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cerca nelle note…" style={{ ...pillSelectStyle, flex: 1, minWidth: 120 }} />
         </div>
-        <button onClick={()=>setShowForm(s=>!s)} style={btnPrimary}>
+        <button onClick={()=>{ setShowForm(s=>!s); setEditingId(null); }} style={btnPrimary}>
           <span>{showForm ? "✕" : "+"}</span> {showForm ? "Chiudi" : "Nuova"}
         </button>
       </div>
 
       {showForm && <TxForm categories={categories} onSubmit={(tx)=>{ onAdd(tx); setShowForm(false); }} />}
+      {editingTx && <TxForm categories={categories} initial={editingTx} onSubmit={(patch)=>{ onUpdate(editingTx.id, patch); setEditingId(null); }} onCancel={()=>setEditingId(null)} />}
 
       <div style={{ ...S.card, padding: 0, overflow: "hidden" }}>
         {filtered.length === 0 ? (
@@ -757,7 +864,7 @@ function Transazioni({ transactions, categories, catMap, onAdd, onRemove }) {
         ) : filtered.map((t, i) => {
           const c = catMap[t.categoryId];
           return (
-            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: i === filtered.length-1 ? "none" : `1px solid ${TOKENS.line}` }}>
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: i === filtered.length-1 ? "none" : `1px solid ${TOKENS.line}` }}>
               <div style={{ width: 34, height: 34, borderRadius: 8, background: (c?.color||"#999")+"22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{c?.icon || "•"}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{c?.name || "Senza categoria"}</div>
@@ -769,6 +876,10 @@ function Transazioni({ transactions, categories, catMap, onAdd, onRemove }) {
               <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, fontSize: 14.5, color: t.type === "income" ? TOKENS.accent : TOKENS.negative, whiteSpace: "nowrap" }}>
                 {t.type === "income" ? "+" : "−"}{eur(t.amount)}
               </div>
+              <button onClick={() => { setEditingId(t.id); setShowForm(false); }}
+                style={{ border: "none", background: "transparent", color: TOKENS.inkSoft, borderRadius: 6, padding: "6px 6px", cursor: "pointer", fontSize: 13, flexShrink: 0 }}>
+                ✎
+              </button>
               <button onClick={() => confirmId === t.id ? (onRemove(t.id), setConfirmId(null)) : setConfirmId(t.id)}
                 style={{ border: "none", background: confirmId === t.id ? TOKENS.negative : "transparent", color: confirmId === t.id ? "#fff" : TOKENS.inkSoft, borderRadius: 6, padding: "6px 8px", cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                 <span>🗑</span>{confirmId === t.id ? "conferma" : ""}
@@ -781,15 +892,19 @@ function Transazioni({ transactions, categories, catMap, onAdd, onRemove }) {
   );
 }
 
-function TxForm({ categories, onSubmit }) {
-  const [type, setType] = useState("expense");
-  const [amount, setAmount] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [date, setDate] = useState(todayISO());
-  const [note, setNote] = useState("");
+function TxForm({ categories, onSubmit, initial, onCancel }) {
+  const [type, setType] = useState(initial?.type || "expense");
+  const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
+  const [categoryId, setCategoryId] = useState(initial?.categoryId || (categories.find(c => c.type === (initial?.type || "expense"))?.id || ""));
+  const [date, setDate] = useState(initial?.date || todayISO());
+  const [note, setNote] = useState(initial?.note || "");
   const opts = categories.filter(c => c.type === type);
+  const firstRun = useRef(true);
 
-  useEffect(() => { setCategoryId(opts[0]?.id || ""); }, [type]); // eslint-disable-line
+  useEffect(() => {
+    if (firstRun.current) { firstRun.current = false; return; }
+    setCategoryId(opts[0]?.id || "");
+  }, [type]); // eslint-disable-line
 
   function submit(e) {
     e.preventDefault();
@@ -819,7 +934,10 @@ function TxForm({ categories, onSubmit }) {
         </select>
       </Field>
       <Field label="Nota (opzionale)"><input value={note} onChange={e=>setNote(e.target.value)} placeholder="es. cena con amici" style={inputStyle} /></Field>
-      <button type="submit" style={{ ...btnPrimary, justifyContent: "center" }}><span>✓</span> Salva transazione</button>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button type="submit" style={{ ...btnPrimary, justifyContent: "center", flex: 1 }}><span>✓</span> {initial ? "Salva modifiche" : "Salva transazione"}</button>
+        {initial && <button type="button" onClick={onCancel} style={{ ...btnPrimary, background: TOKENS.paper2, color: TOKENS.ink }}>Annulla</button>}
+      </div>
     </form>
   );
 }
@@ -1074,10 +1192,11 @@ function ResourceForm({ onSubmit }) {
 
 /* ---------- Backup su Google Sheets ---------- */
 
-function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onSyncAll, onPull, count, pendingCount }) {
+function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onSyncAll, onPull, count, pendingCount, syncFailStreak, onExport, onImportFile }) {
   const [draft, setDraft] = useState(sheetUrl);
   const [openGuide, setOpenGuide] = useState(!sheetUrl);
   const [copied, setCopied] = useState(false);
+  const fileInputRef = useRef(null);
 
   function copyCode() {
     navigator.clipboard.writeText(APPS_SCRIPT_CODE).then(() => { setCopied(true); setTimeout(()=>setCopied(false), 1800); });
@@ -1085,6 +1204,15 @@ function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onS
 
   return (
     <>
+      {sheetUrl && syncFailStreak >= 3 && (
+        <div style={{ ...S.card, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, background: TOKENS.negativeSoft, boxShadow: "none" }}>
+          <span style={{ fontSize: 16 }}>⚠️</span>
+          <div style={{ flex: 1, fontSize: 13.5 }}>
+            Il collegamento al foglio Google non risponde da un po': controlla che l'URL qui sotto sia ancora corretto e che il deployment su Google sia ancora attivo.
+          </div>
+        </div>
+      )}
+
       <div style={{ ...S.card, display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: sheetUrl ? TOKENS.accent : TOKENS.line, flexShrink: 0 }} />
@@ -1115,6 +1243,19 @@ function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onS
             {pendingCount > 0 && <span style={{ color: TOKENS.amber }}> · {pendingCount} in attesa di rete</span>}
           </p>
         )}
+      </div>
+
+      <div style={S.card}>
+        <h3 style={S.sectionTitle}>Backup locale</h3>
+        <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, lineHeight: 1.6, margin: "0 0 12px" }}>
+          Un file sul tuo dispositivo, indipendente da Google: utile come rete di sicurezza in più, ad esempio prima di svuotare la cache del browser.
+        </p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={onExport} style={btnPrimary}><span>⬇</span> Scarica una copia</button>
+          <button onClick={()=>fileInputRef.current?.click()} style={{ ...btnPrimary, background: TOKENS.paper2, color: TOKENS.ink }}><span>⬆</span> Ripristina da file</button>
+          <input ref={fileInputRef} type="file" accept="application/json" style={{ display: "none" }}
+            onChange={e => { const f = e.target.files?.[0]; onImportFile(f); e.target.value = ""; }} />
+        </div>
       </div>
 
       <div style={S.card}>

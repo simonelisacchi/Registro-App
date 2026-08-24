@@ -98,7 +98,7 @@ const DEFAULT_CATEGORIES = [
   { id: "altro-i", name: "Altro", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const APP_VERSION = "1.11.0";
+const APP_VERSION = "1.12.0";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
@@ -719,6 +719,23 @@ function Dashboard({ transactions, categories, catMap, archives }) {
     }));
   }, [transactions]);
 
+  const dailyThisMonth = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    const today = now.getDate();
+    const days = [];
+    let cumEnt = 0, cumUsc = 0;
+    for (let d = 1; d <= today; d++) {
+      const dateStr = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      transactions.forEach(t => {
+        if (t.date !== dateStr) return;
+        if (t.type === "income") cumEnt += t.amount; else cumUsc += t.amount;
+      });
+      days.push({ day: d, label: String(d), entrate: +cumEnt.toFixed(2), uscite: +cumUsc.toFixed(2) });
+    }
+    return days;
+  }, [transactions]);
+
   const catData = useMemo(() => {
     const filtered = transactions.filter(t => {
       if (t.type !== "expense") return false;
@@ -769,9 +786,9 @@ function Dashboard({ transactions, categories, catMap, archives }) {
       </div>
 
       <div style={S.card}>
-        <h3 style={S.sectionTitle}>Andamento mensile</h3>
+        <h3 style={S.sectionTitle}>Andamento del mese</h3>
         <ResponsiveContainer width="100%" height={220}>
-          <AreaChart data={monthly} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+          <AreaChart data={dailyThisMonth} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
             <defs>
               <linearGradient id="gEnt" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={TOKENS.accent} stopOpacity={0.35}/>
@@ -785,14 +802,14 @@ function Dashboard({ transactions, categories, catMap, archives }) {
             <CartesianGrid stroke={TOKENS.line} vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={{ stroke: TOKENS.line }} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={false} tickLine={false} width={46} />
-            <Tooltip formatter={(v) => eur(v)} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8 }} />
+            <Tooltip formatter={(v) => eur(v)} labelFormatter={(d) => `giorno ${d}`} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8 }} />
             <Area type="monotone" dataKey="entrate" stroke={TOKENS.accent} fill="url(#gEnt)" strokeWidth={2} />
             <Area type="monotone" dataKey="uscite" stroke={TOKENS.negative} fill="url(#gUsc)" strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>
         <div style={{ display: "flex", gap: 16, marginTop: 6, fontSize: 12.5, color: TOKENS.inkSoft }}>
-          <LegendDot color={TOKENS.accent} label="entrate" />
-          <LegendDot color={TOKENS.negative} label="uscite" />
+          <LegendDot color={TOKENS.accent} label="entrate (cumulate)" />
+          <LegendDot color={TOKENS.negative} label="uscite (cumulate)" />
         </div>
       </div>
 
@@ -800,7 +817,7 @@ function Dashboard({ transactions, categories, catMap, archives }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
           <h3 style={S.sectionTitle}>Categorie principali</h3>
           <div style={{ display: "flex", gap: 4 }}>
-            {[["mese","mese"],["anno","anno"],["sempre","sempre"]].map(([v,l]) => (
+            {[["mese","mese"],["anno","anno"]].map(([v,l]) => (
               <button key={v} onClick={()=>setCatPeriod(v)} style={{
                 fontSize: 11.5, padding: "5px 10px", borderRadius: 999, cursor: "pointer", border: "none",
                 background: catPeriod===v?TOKENS.ink:TOKENS.paper2, color: catPeriod===v?TOKENS.paper:TOKENS.inkSoft,
@@ -1317,8 +1334,20 @@ function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onS
 function Risparmi({ savings, onAdd, onRemove }) {
   const [showForm, setShowForm] = useState(false);
   const [confirmId, setConfirmId] = useState(null);
+  const [adjusting, setAdjusting] = useState(false);
+  const [adjustValue, setAdjustValue] = useState("");
 
   const total = savings.reduce((s, m) => s + (m.type === "prelievo" ? -m.amount : m.amount), 0);
+
+  function submitAdjust(e) {
+    e.preventDefault();
+    const target = parseFloat(String(adjustValue).replace(",", "."));
+    if (isNaN(target)) return;
+    const diff = +(target - total).toFixed(2);
+    if (diff === 0) { setAdjusting(false); setAdjustValue(""); return; }
+    onAdd({ type: diff > 0 ? "versamento" : "prelievo", amount: Math.abs(diff), date: todayISO(), note: "Rettifica saldo (es. arrotondamenti)" });
+    setAdjusting(false); setAdjustValue("");
+  }
 
   const sorted = useMemo(() => [...savings].sort((a, b) => a.date.localeCompare(b.date)), [savings]);
   const chartData = useMemo(() => {
@@ -1337,6 +1366,19 @@ function Risparmi({ savings, onAdd, onRemove }) {
         <p style={{ color: TOKENS.inkSoft, fontSize: 12.5, margin: "4px 0 0", lineHeight: 1.5 }}>
           Aggiornato a mano — utile per arrotondamenti, interessi o versamenti su un fondo separato (es. il "salvadanaio" di un conto), tenuto distinto dalle spese normali.
         </p>
+        {!adjusting ? (
+          <button onClick={()=>{ setAdjusting(true); setAdjustValue(total.toFixed(2)); }} style={{ ...btnPrimary, background: TOKENS.paper2, color: TOKENS.ink, marginTop: 12 }}>
+            <span>⚖️</span> Aggiusta saldo
+          </button>
+        ) : (
+          <form onSubmit={submitAdjust} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
+            <Field label="Saldo reale attuale (€)">
+              <input type="number" step="0.01" value={adjustValue} onChange={e=>setAdjustValue(e.target.value)} style={{ ...inputStyle, maxWidth: 160 }} autoFocus />
+            </Field>
+            <button type="submit" style={btnPrimary}><span>✓</span> Applica</button>
+            <button type="button" onClick={()=>{ setAdjusting(false); setAdjustValue(""); }} style={{ ...btnPrimary, background: TOKENS.paper2, color: TOKENS.ink }}>Annulla</button>
+          </form>
+        )}
       </div>
 
       {chartData.length >= 2 && (

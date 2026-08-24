@@ -1,5 +1,9 @@
 # Changelog — Registro
 
+## v1.20.0
+- **Categoria di entrata "Altro" rinominata in "Paghetta".** Migrazione automatica anche per chi ha già dei dati salvati (locale + sincronizzata sul foglio Google al primo avvio di questa versione) — tocca solo quella categoria di sistema specifica, non un'eventuale categoria "Altro" creata a mano in seguito.
+- **Corretta la tabella "Confronto per anno" (Categorie) su telefono**: con 4 o più anni le colonne si stringevano troppo e i numeri si accavallavano. Ora la larghezza minima della tabella si adatta al numero di anni presenti — con pochi anni resta compatta, con più anni scorre in orizzontale invece di schiacciarsi.
+
 ## v1.19.1
 - **Corretto bug del fuso orario sulla data "oggi".** La data precompilata su nuove transazioni/movimenti, il nome del file di backup e il "mese corrente" usato per gli avvisi budget e il confronto categorie si basavano su UTC invece che sull'ora locale. Nella finestra tra mezzanotte e le 1-2 di notte (a seconda di ora solare/legale), l'app avrebbe mostrato ancora il giorno/mese precedente come "oggi". Ora usa sempre la data del calendario locale del dispositivo. (I timestamp tecnici di sincronizzazione/archiviazione restano invece in UTC, correttamente: sono istanti assoluti, non giorni di calendario.)
 

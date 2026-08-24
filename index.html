@@ -128,10 +128,10 @@ const DEFAULT_CATEGORIES = [
   { id: "cloud", name: "Cloud", icon: "☁️", color: "#3B6FA8", type: "expense", budget: 0 },
   { id: "stipendio", name: "Stipendio", icon: "💼", color: "#2F6F5E", type: "income" },
   { id: "regali", name: "Regali", icon: "🎁", color: "#BE5A83", type: "income" },
-  { id: "altro-i", name: "Altro", icon: "➕", color: "#2F6F5E", type: "income" },
+  { id: "altro-i", name: "Paghetta", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const APP_VERSION = "1.19.1";
+const APP_VERSION = "1.20.0";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
@@ -381,6 +381,20 @@ function App() {
       if (prev.some(c => c.name.toLowerCase() === "cloud")) return prev;
       const next = [...prev, { id: uid(), name: "Cloud", icon: "☁️", color: "#3B6FA8", type: "expense", budget: 0 }];
       saveKey("categories", next);
+      return next;
+    });
+  }, []); // eslint-disable-line
+
+  // Rinomina la vecchia categoria di entrata "Altro" (id altro-i) in "Paghetta", anche per chi
+  // ha già dei dati salvati. Tocca solo quella specifica categoria di sistema, mai una eventuale
+  // categoria "Altro" creata a mano dall'utente in seguito.
+  useEffect(() => {
+    setCategories(prev => {
+      const target = prev.find(c => c.id === "altro-i" && c.name.trim().toLowerCase() === "altro");
+      if (!target) return prev;
+      const next = prev.map(c => c.id === "altro-i" ? { ...c, name: "Paghetta" } : c);
+      saveKey("categories", next);
+      pushCategoriesToSheet(next);
       return next;
     });
   }, []); // eslint-disable-line
@@ -1450,7 +1464,7 @@ function Categorie({ categories, transactions, archives, onAdd, onUpdate, onRemo
       <div style={S.card}>
         <h3 style={S.sectionTitle}>Confronto per anno</h3>
         <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: 340 }}>
+          <div style={{ minWidth: Math.max(340, 128 + years.length * 88) }}>
             <div style={{ display: "grid", gridTemplateColumns: `1.4fr repeat(${years.length}, 1fr)`, fontSize: 11, letterSpacing: 1, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", padding: "0 0 8px", borderBottom: `1px solid ${TOKENS.ink}` }}>
               <span>CATEGORIA</span>
               {years.map(y => <span key={y} style={{ textAlign: "right" }}>{y}{archivedYearSet.has(y) ? " 🔒" : ""}</span>)}

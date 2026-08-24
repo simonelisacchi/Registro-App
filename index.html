@@ -106,7 +106,7 @@
 <script type="text/babel" data-presets="react">
 
 const { useState, useEffect, useMemo, useRef } = React;
-const { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell } = Recharts;
+const { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, BarChart, Bar } = Recharts;
 
 /* ---------- dati di partenza ---------- */
 
@@ -131,7 +131,7 @@ const DEFAULT_CATEGORIES = [
   { id: "altro-i", name: "Paghetta", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const APP_VERSION = "1.20.0";
+const APP_VERSION = "1.21.0";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
@@ -909,6 +909,7 @@ function App() {
           <TabBtn active={tab==="dashboard"} onClick={()=>setTab("dashboard")} icon="▦" label="Dashboard" />
           <TabBtn active={tab==="transazioni"} onClick={()=>setTab("transazioni")} icon="☰" label="Transazioni" />
           <TabBtn active={tab==="categorie"} onClick={()=>setTab("categorie")} icon="🏷" label="Categorie" />
+          <TabBtn active={tab==="analisi"} onClick={()=>setTab("analisi")} icon="◫" label="Analisi" />
           <TabBtn active={tab==="risparmi"} onClick={()=>setTab("risparmi")} icon="🏦" label="Risparmi" />
           <TabBtn active={tab==="backup"} onClick={()=>setTab("backup")} icon="☁" label="Backup" dot={!sheetUrl || pendingCount > 0} />
         </nav>
@@ -927,6 +928,7 @@ function App() {
           {tab === "dashboard" && <Dashboard transactions={transactions} categories={categories} catMap={catMap} archives={archives} />}
           {tab === "transazioni" && <Transazioni transactions={transactions} categories={categories} catMap={catMap} onAdd={addTransaction} onRemove={removeTransaction} onUpdate={updateTransaction} existingTrips={existingTrips} />}
           {tab === "categorie" && <Categorie categories={categories} transactions={transactions} archives={archives} onAdd={addCategory} onUpdate={updateCategory} onRemove={removeCategory} onCloseYear={closeYear} onEditArchiveIncome={setArchiveIncome} />}
+          {tab === "analisi" && <Analisi transactions={transactions} categories={categories} catMap={catMap} />}
           {tab === "risparmi" && <Risparmi savings={savings} onAdd={addSaving} onRemove={removeSaving} />}
           {tab === "backup" && <Backup sheetUrl={sheetUrl} onSaveUrl={saveSheetUrl} lastSync={lastSync} lastPull={lastPull} syncing={syncing} pulling={pulling} onSyncAll={syncAllNow} onPull={pullFromSheet} count={transactions.length} pendingCount={pendingCount} syncFailStreak={syncFailStreak} onExport={exportBackup} onImportFile={importBackupFile} />}
         </main>
@@ -1233,6 +1235,160 @@ function LegendDot({ color, label }) {
   return <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, background: color, borderRadius: "50%", display: "inline-block" }} />{label}</span>;
 }
 
+/* ---------- Analisi ---------- */
+
+function Analisi({ transactions, categories, catMap }) {
+  const expenseCats = useMemo(() => categories.filter(c => c.type === "expense"), [categories]);
+  const [selectedCatId, setSelectedCatId] = useState(() => expenseCats[0]?.id || "");
+
+  useEffect(() => {
+    if (!selectedCatId && expenseCats.length > 0) setSelectedCatId(expenseCats[0].id);
+  }, [expenseCats]); // eslint-disable-line
+
+  const monthsRange = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth() + 1;
+    const keys = [];
+    for (let i = 11; i >= 0; i--) {
+      let mm = m - i, yy = y;
+      while (mm <= 0) { mm += 12; yy -= 1; }
+      keys.push(`${yy}-${String(mm).padStart(2, "0")}`);
+    }
+    return keys;
+  }, []);
+
+  const trendData = useMemo(() => {
+    return monthsRange.map(k => {
+      const value = transactions
+        .filter(t => t.type === "expense" && t.categoryId === selectedCatId && monthKey(t.date) === k)
+        .reduce((s, t) => s + t.amount, 0);
+      return { key: k, label: monthLabel(k), value: +value.toFixed(2) };
+    });
+  }, [transactions, selectedCatId, monthsRange]);
+
+  const now = new Date();
+  const year = now.getFullYear(), month0 = now.getMonth(), dayToday = now.getDate();
+  const daysInMonth = new Date(year, month0 + 1, 0).getDate();
+  const thisMonthKey = `${year}-${String(month0 + 1).padStart(2, "0")}`;
+  const [pmY, pmM] = thisMonthKey.split("-").map(Number);
+  const prevMonthKey = pmM === 1 ? `${pmY - 1}-12` : `${pmY}-${String(pmM - 1).padStart(2, "0")}`;
+
+  const spesoFinora = useMemo(() =>
+    transactions.filter(t => t.type === "expense" && monthKey(t.date) === thisMonthKey).reduce((s, t) => s + t.amount, 0),
+  [transactions, thisMonthKey]);
+
+  const spesoMesePrecedenteStessoGiorno = useMemo(() =>
+    transactions.filter(t => t.type === "expense" && monthKey(t.date) === prevMonthKey && Number(t.date.slice(8, 10)) <= dayToday).reduce((s, t) => s + t.amount, 0),
+  [transactions, prevMonthKey, dayToday]);
+
+  const avgPerDay = spesoFinora / dayToday;
+  const proiezione = avgPerDay * daysInMonth;
+  const giorniRestanti = daysInMonth - dayToday;
+  const deltaVsMesePrecedente = spesoMesePrecedenteStessoGiorno > 0
+    ? ((spesoFinora - spesoMesePrecedenteStessoGiorno) / spesoMesePrecedenteStessoGiorno) * 100
+    : (spesoFinora > 0 ? Infinity : null);
+
+  const parseLocal = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const expenseTx = useMemo(() => transactions.filter(t => t.type === "expense"), [transactions]);
+
+  const weekdayData = useMemo(() => {
+    if (expenseTx.length === 0) return [];
+    const dates = expenseTx.map(t => t.date).sort();
+    const minD = parseLocal(dates[0]);
+    const maxD = parseLocal(dates[dates.length - 1]);
+    const totals = [0,0,0,0,0,0,0];
+    const counts = [0,0,0,0,0,0,0];
+    expenseTx.forEach(t => { totals[parseLocal(t.date).getDay()] += t.amount; });
+    for (let d = new Date(minD); d <= maxD; d.setDate(d.getDate() + 1)) {
+      counts[d.getDay()]++;
+    }
+    const labels = ["Dom","Lun","Mar","Mer","Gio","Ven","Sab"];
+    const order = [1,2,3,4,5,6,0];
+    return order.map(idx => ({
+      day: labels[idx], value: counts[idx] > 0 ? +(totals[idx] / counts[idx]).toFixed(2) : 0, isWeekend: idx === 0 || idx === 6,
+    }));
+  }, [expenseTx]);
+
+  const selectedCat = catMap[selectedCatId];
+
+  return (
+    <>
+      <div style={S.card}>
+        <h3 style={S.sectionTitle}>Andamento categoria</h3>
+        {expenseCats.length === 0 ? (
+          <p style={{ color: TOKENS.inkSoft, fontSize: 13.5 }}>Crea prima qualche categoria di spesa.</p>
+        ) : (
+          <>
+            <select value={selectedCatId} onChange={e => setSelectedCatId(e.target.value)} style={{ ...inputStyle, maxWidth: 220, marginBottom: 14 }}>
+              {expenseCats.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+            </select>
+            <ResponsiveContainer width="100%" height={180}>
+              <AreaChart data={trendData} margin={{ left: -18, top: 6, right: 6 }}>
+                <defs>
+                  <linearGradient id="gTrendCat" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={selectedCat?.color || TOKENS.negative} stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor={selectedCat?.color || TOKENS.negative} stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke={TOKENS.line} vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={{ stroke: TOKENS.line }} tickLine={false} interval={1} />
+                <YAxis tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={false} tickLine={false} width={46} />
+                <Tooltip formatter={(v) => eur(v)} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8, background: TOKENS.cardBg, color: TOKENS.ink }} itemStyle={{ color: TOKENS.ink }} labelStyle={{ color: TOKENS.inkSoft }} />
+                <Area type="monotone" dataKey="value" stroke={selectedCat?.color || TOKENS.negative} fill="url(#gTrendCat)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </>
+        )}
+      </div>
+
+      <div style={S.card}>
+        <h3 style={S.sectionTitle}>Proiezione fine mese</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px,1fr))", gap: 12 }}>
+          <StatCard label="Speso finora" value={eur(spesoFinora)} tone="neg" icon="↘" />
+          <StatCard label="Media giornaliera" value={eur(avgPerDay)} icon="◆" />
+          <StatCard label="Proiezione fine mese" value={eur(proiezione)} tone="neg" icon="◆" />
+        </div>
+        <p style={{ fontSize: 12.5, color: TOKENS.inkSoft, marginTop: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          Mancano {giorniRestanti} {giorniRestanti === 1 ? "giorno" : "giorni"} alla fine del mese.
+          {deltaVsMesePrecedente !== null && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              Rispetto allo stesso punto del mese scorso: <DeltaBadge pct={deltaVsMesePrecedente} />
+            </span>
+          )}
+        </p>
+      </div>
+
+      <div style={S.card}>
+        <h3 style={S.sectionTitle}>Spesa media per giorno della settimana</h3>
+        {weekdayData.length === 0 ? (
+          <p style={{ color: TOKENS.inkSoft, fontSize: 13.5 }}>Non ci sono ancora abbastanza transazioni.</p>
+        ) : (
+          <>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={weekdayData} margin={{ left: -18, top: 6, right: 6 }}>
+                <CartesianGrid stroke={TOKENS.line} vertical={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={{ stroke: TOKENS.line }} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={false} tickLine={false} width={46} />
+                <Tooltip formatter={(v) => eur(v)} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8, background: TOKENS.cardBg, color: TOKENS.ink }} itemStyle={{ color: TOKENS.ink }} labelStyle={{ color: TOKENS.inkSoft }} />
+                <Bar dataKey="value" radius={[4,4,0,0]}>
+                  {weekdayData.map((d, i) => <Cell key={i} fill={d.isWeekend ? TOKENS.amber : TOKENS.negative} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <div style={{ display: "flex", gap: 16, marginTop: 6, fontSize: 12.5, color: TOKENS.inkSoft }}>
+              <LegendDot color={TOKENS.negative} label="feriali" />
+              <LegendDot color={TOKENS.amber} label="weekend" />
+            </div>
+            {expenseTx.length < 14 && (
+              <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 10 }}>Con poche transazioni storiche il pattern è ancora indicativo — diventa più affidabile con più dati.</p>
+            )}
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
 /* ---------- Transazioni ---------- */
 
 function Transazioni({ transactions, categories, catMap, onAdd, onRemove, onUpdate, existingTrips }) {
@@ -1252,6 +1408,7 @@ function Transazioni({ transactions, categories, catMap, onAdd, onRemove, onUpda
     (filterTrip === "all" || t.trip === filterTrip) &&
     (search.trim() === "" || (t.note || "").toLowerCase().includes(search.trim().toLowerCase()))
   );
+  const sorted = useMemo(() => [...filtered].sort((a, b) => b.date.localeCompare(a.date)), [filtered]);
 
   const tripTotal = filterTrip !== "all" ? filtered.reduce((s, t) => s + (t.type === "income" ? t.amount : -t.amount), 0) : null;
 
@@ -1288,12 +1445,12 @@ function Transazioni({ transactions, categories, catMap, onAdd, onRemove, onUpda
       {editingTx && <TxForm categories={categories} existingTrips={existingTrips} initial={editingTx} onSubmit={(patch)=>{ onUpdate(editingTx.id, patch); setEditingId(null); }} onCancel={()=>setEditingId(null)} />}
 
       <div style={{ ...S.card, padding: 0, overflow: "hidden" }}>
-        {filtered.length === 0 ? (
+        {sorted.length === 0 ? (
           <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, padding: 18, margin: 0 }}>Nessuna transazione trovata.</p>
-        ) : filtered.map((t, i) => {
+        ) : sorted.map((t, i) => {
           const c = catMap[t.categoryId];
           return (
-            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: i === filtered.length-1 ? "none" : `1px solid ${TOKENS.line}` }}>
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: i === sorted.length-1 ? "none" : `1px solid ${TOKENS.line}` }}>
               <div style={{ width: 34, height: 34, borderRadius: 8, background: (c?.color||"#999")+"22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{c?.icon || "•"}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>

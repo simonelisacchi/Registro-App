@@ -1,5 +1,15 @@
 # Changelog — Registro
 
+## v1.21.0
+- **Nuova scheda "Analisi"**, dedicata all'analisi approfondita delle spese (separata dalla Dashboard, che resta per la lettura veloce quotidiana):
+  - **Andamento categoria**: grafico degli ultimi 12 mesi per la categoria di spesa scelta.
+  - **Proiezione fine mese**: speso finora, media giornaliera, proiezione a fine mese basata sul ritmo attuale, e confronto con lo stesso punto del mese scorso.
+  - **Spesa media per giorno della settimana**: media di spesa per ciascun giorno (Lun-Dom), calcolata sull'effettivo numero di occorrenze di quel giorno nel periodo storico — non solo sui giorni in cui hai speso — per un confronto feriali/weekend più corretto.
+  - Tutto calcolato sui dati già presenti in locale, nessuna sincronizzazione aggiuntiva richiesta.
+
+## v1.20.1
+- **Transazioni ordinate per data, più recenti in alto.** Prima l'ordine seguiva solo l'inserimento/sincronizzazione (con dati importati o sync poteva uscire fuori ordine); ora è sempre per data decrescente, con le voci dello stesso giorno ordinate per aggiunta più recente.
+
 ## v1.20.0
 - **Categoria di entrata "Altro" rinominata in "Paghetta".** Migrazione automatica anche per chi ha già dei dati salvati (locale + sincronizzata sul foglio Google al primo avvio di questa versione) — tocca solo quella categoria di sistema specifica, non un'eventuale categoria "Altro" creata a mano in seguito.
 - **Corretta la tabella "Confronto per anno" (Categorie) su telefono**: con 4 o più anni le colonne si stringevano troppo e i numeri si accavallavano. Ora la larghezza minima della tabella si adatta al numero di anni presenti — con pochi anni resta compatta, con più anni scorre in orizzontale invece di schiacciarsi.

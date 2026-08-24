@@ -98,7 +98,7 @@ const DEFAULT_CATEGORIES = [
   { id: "altro-i", name: "Altro", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const APP_VERSION = "1.10.4";
+const APP_VERSION = "1.10.5";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
@@ -589,7 +589,7 @@ function App() {
         </header>
 
         <div className="layout-row">
-        <nav className="tabs-nav" style={S.tabs}>
+        <nav className="tabs-nav">
           <TabBtn active={tab==="dashboard"} onClick={()=>setTab("dashboard")} icon="▦" label="Dashboard" />
           <TabBtn active={tab==="transazioni"} onClick={()=>setTab("transazioni")} icon="☰" label="Transazioni" />
           <TabBtn active={tab==="categorie"} onClick={()=>setTab("categorie")} icon="🏷" label="Categorie" />
@@ -654,7 +654,6 @@ const S = {
   headerBalance: { display: "flex", flexDirection: "column", alignItems: "flex-end" },
   headerBalanceLabel: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: TOKENS.inkSoft, letterSpacing: 1 },
   headerBalanceNum: { fontFamily: "'Fraunces', serif", fontSize: 25, fontWeight: 600 },
-  tabs: { display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" },
   main: { display: "flex", flexDirection: "column", gap: 16 },
   card: { background: "#fff", borderRadius: 14, padding: 18, boxShadow: "0 1px 2px rgba(33,31,28,0.04), 0 6px 16px rgba(33,31,28,0.04)" },
   sectionTitle: { fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, margin: "0 0 12px" },

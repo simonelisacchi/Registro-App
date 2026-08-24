@@ -37,18 +37,18 @@
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
     display: flex; justify-content: space-around; align-items: stretch; gap: 2px;
     background: #fff; border-top: 1px solid #E4DFD3;
-    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    padding: 4px 4px calc(4px + max(env(safe-area-inset-bottom), 20px));
   }
   .tab-btn-el {
     position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 2px; flex: 1; min-width: 0; padding: 5px 2px; border: none; background: transparent;
-    color: #78725f; font-size: 10px; font-weight: 500; cursor: pointer; border-radius: 10px; font-family: 'Inter', sans-serif;
+    gap: 1px; flex: 1; min-width: 0; padding: 3px 2px; border: none; background: transparent;
+    color: #78725f; font-size: 9.5px; line-height: 1.15; font-weight: 500; cursor: pointer; border-radius: 10px; font-family: 'Inter', sans-serif;
   }
-  .tab-btn-el .tab-icon { font-size: 18px; line-height: 1; }
+  .tab-btn-el .tab-icon { font-size: 17px; line-height: 1; }
   .tab-btn-el.active { color: #211F1C; background: #EFEBE2; }
-  .tab-btn-el .tab-dot { position: absolute; top: 2px; right: 18%; width: 6px; height: 6px; border-radius: 50%; background: #C99A3B; }
-  .content-col { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
-  .fab-btn { bottom: calc(84px + env(safe-area-inset-bottom)) !important; }
+  .tab-btn-el .tab-dot { position: absolute; top: 1px; right: 18%; width: 6px; height: 6px; border-radius: 50%; background: #C99A3B; }
+  .content-col { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
+  .fab-btn { bottom: calc(64px + env(safe-area-inset-bottom)) !important; }
 
   @media (min-width: 900px) {
     .layout-row { display: flex; align-items: flex-start; gap: 28px; }
@@ -97,7 +97,7 @@ const DEFAULT_CATEGORIES = [
   { id: "altro-i", name: "Altro", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const APP_VERSION = "1.10.0";
+const APP_VERSION = "1.10.2";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);

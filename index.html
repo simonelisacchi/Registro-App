@@ -101,7 +101,7 @@ const DEFAULT_CATEGORIES = [
   { id: "altro-i", name: "Altro", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const APP_VERSION = "1.16.1";
+const APP_VERSION = "1.16.2";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
@@ -123,6 +123,7 @@ function markDeletedById(sheet, id, col) {
 function doPost(e) {
   var body = JSON.parse(e.postData.contents);
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  console.log('AZIONE RICEVUTA: ' + body.action + ' | FOGLIO ATTIVO: ' + ss.getName() + ' | DATI: ' + JSON.stringify(body));
 
   if (body.action === 'append') {
     var t = body.tx;

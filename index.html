@@ -31,6 +31,8 @@
   #root { min-height: 100vh; }
   ::selection { background: #C99A3B55; }
   input, select, textarea, button { font-family: 'Inter', sans-serif; }
+  * { -webkit-tap-highlight-color: transparent; }
+  button { outline: none; }
   input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid #C99A3B; outline-offset: 1px; }
   @media (min-width: 640px) { .grid-2 { grid-template-columns: 1fr 1fr !important; } }
 
@@ -99,7 +101,7 @@ const DEFAULT_CATEGORIES = [
   { id: "altro-i", name: "Altro", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const APP_VERSION = "1.16.0";
+const APP_VERSION = "1.16.1";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
@@ -353,7 +355,8 @@ function App() {
     let sentAny = false;
     for (const item of q) {
       try {
-        await fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(item.payload) });
+        const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(item.payload) });
+        if (!res.ok) throw new Error("risposta non valida dal foglio");
         queueRemove(item.id);
         const ts = new Date().toISOString();
         setLastSync(ts); saveKey("last-sync", ts);
@@ -513,7 +516,8 @@ function App() {
         if (url) {
           const catsPayload = Object.entries(totals).map(([id, total]) => ({ name: catById[id]?.name || names[id]?.name || "Altro", total }));
           try {
-            await fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "closeYear", year, categories: catsPayload, totalIncome }) });
+            const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "closeYear", year, categories: catsPayload, totalIncome }) });
+            if (!res.ok) throw new Error("risposta non valida dal foglio");
           } catch (e) { console.error("auto-close sync error", e); }
         }
       }
@@ -528,19 +532,19 @@ function App() {
   async function pushToSheet(payload) {
     if (!sheetUrl) return;
     try {
-      await fetch(sheetUrl, {
+      const res = await fetch(sheetUrl, {
         method: "POST",
-        mode: "no-cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload),
       });
+      if (!res.ok) throw new Error("risposta non valida dal foglio");
       const ts = new Date().toISOString();
       setLastSync(ts); saveKey("last-sync", ts);
       showToast("Sincronizzato ✓", "success");
     } catch (e) {
       console.error("sync error, messo in coda per riprovare al ritorno della rete", e);
       queueAdd(payload);
-      showToast("Salvato — in attesa di rete", "warn");
+      showToast("Non sincronizzato — in coda, riproverà da solo", "warn");
     }
   }
 

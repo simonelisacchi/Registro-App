@@ -1,4 +1,4 @@
-const CACHE_NAME = "registro-shell-v1.10.2";
+const CACHE_NAME = "registro-shell-v1.10.3";
 const CORE_ASSETS = [
   "./",
   "./index.html",

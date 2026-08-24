@@ -1,4 +1,4 @@
-const CACHE_NAME = "registro-shell-v1.16.2";
+const CACHE_NAME = "registro-shell-v1.18.0";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -27,7 +27,6 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
-  // Non toccare mai le chiamate verso il tuo Google Sheet: devono sempre andare in rete, mai da cache.
   if (req.url.includes("script.google.com") || req.url.includes("googleusercontent.com")) return;
 
   event.respondWith(

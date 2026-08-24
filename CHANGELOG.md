@@ -1,35 +1,45 @@
 # Changelog — Registro
 
-## v1.3.0
-- **Tasto rapido**: pulsante flottante "+" sempre visibile (anche in Dashboard) per aggiungere una transazione senza cambiare scheda.
-- **Risolto lo zoom automatico su iPhone**: Safari ingrandisce da solo la pagina quando tocchi un campo con testo sotto i 16px — tutti i campi dell'app sono stati portati a 16px, quindi non serve più fare pinch per tornare alla dimensione normale dopo aver scritto.
-- **Sincronizzazione periodica**: oltre all'invio immediato ad ogni transazione, ogni 5 minuti l'app riprova automaticamente a inviare qualunque cosa fosse rimasta in sospeso (es. per mancanza di rete), senza bisogno di riaprire l'app.
+## v1.18.0
+- **Ricostruita dopo un problema tecnico dell'ambiente di lavoro** che ha cancellato la copia di lavoro del codice — ricreata da zero riprendendo tutte le funzioni fino alla v1.17.0.
+- **Nuovo: eliminare a mano una riga direttamente su Google Sheets ora si riflette nell'app.** Prima la sincronizzazione automatica sapeva solo aggiungere il nuovo e rimuovere ciò che l'app stessa aveva "marchiato" come eliminato — una cancellazione manuale sul foglio (senza passare dall'app) restava invisibile. Ora, se qualcosa che risulta già inviato sparisce dal foglio, viene considerato eliminato anche in locale (transazioni, categorie, risparmi).
+- Aggiunta nella guida in-app una nota sul passaggio "Nuova versione" del deployment su Apps Script, per non dimenticarlo nei prossimi aggiornamenti.
 
-## v1.2.3 — correzione seria
-- **Trovata la vera causa dello schermo bianco**, confermata guardando dal vivo la console del tuo browser: (1) Babel, la libreria che traduce il codice, era rilasciata "senza numero di versione" e ha silenziosamente ricevuto un aggiornamento importante (versione 8) incompatibile con l'app; (2) il servizio da cui scaricavo le librerie (unpkg) stava rispondendo con errori temporanei proprio sul pacchetto dei grafici.
-- **Cambiato fornitore delle librerie esterne**: da unpkg a jsDelivr, più stabile.
-- **Tutte le versioni ora sono bloccate a un numero preciso** (React 18.3.1, Recharts 2.15.4, Babel 7.28.1, ecc.) — non prenderanno mai più aggiornamenti automatici a mia insaputa che potrebbero rompere l'app.
-- Verificato dal vivo, nel browser, prima di consegnarlo: caricamento delle librerie, traduzione del codice e disegno a schermo, tutti confermati funzionanti.
+## v1.17.0
+- Tema Chiaro / Scuro / Sistema, con icona ⚙ accanto al titolo.
 
-## v1.2.2
-- Icona dell'app sostituita con il tuo vero logo (Logo_Dark, dal progetto) al posto del segnaposto disegnato prima.
+## v1.16.2
+- Rimossa la riga di diagnosi temporanea usata per individuare il bug della sincronizzazione dei Risparmi.
 
-## v1.2.1 — correzione
-- **Risolto: schermo bianco.** Mancava una libreria di supporto (`react-is`) richiesta da Recharts per disegnare i grafici; senza quella l'intera app si bloccava prima di mostrare qualsiasi cosa. Aggiunta allo script e alla cache offline.
+## v1.16.1
+- Sincronizzazione verificata per davvero (lettura della risposta del foglio, non più una richiesta "cieca").
+- Tolto l'alone blu al tocco dei pulsanti.
 
-## v1.2.0
-- Nuova icona dell'app: moneta stilizzata con "R" e un rigo (richiama il registro contabile), negli stessi colori dell'app.
-- Guida di pubblicazione passata da Vercel a **GitHub Pages** (un account in meno, incorporato in GitHub).
+## v1.16.0
+- Popup di sincronizzazione visibile su ogni scheda, e pulsante "sincronizza ora" in alto.
 
-## v1.1.0
-- **Offline reale**: un service worker mette in cache l'app e le sue librerie al primo avvio online, così dopo si apre anche senza rete.
-- **Coda di sincronizzazione**: se un invio al foglio Google fallisce per mancanza di rete, resta in attesa e riparte da solo appena il dispositivo torna online (o al successivo avvio dell'app). Contatore visibile nella scheda Backup.
-- Numero di versione visibile in fondo all'app.
+## v1.15.0
+- "Chiudi un anno" e "Correggi le entrate" diventati pannelli richiudibili in fondo a Categorie.
+- Scheda Backup riorganizzata: automatico vs azioni manuali, con spiegazioni chiare.
 
-## v1.0.0
-- Prima versione dell'app web indipendente (senza dipendenza da Claude), dati salvati nel browser del dispositivo.
-- Dashboard con andamento mensile, categorie principali, riepilogo mensile.
-- Budget mensili per categoria con avvisi automatici.
-- Backup su Google Sheets (invio automatico ad ogni transazione, tab per anno per restare leggero, caricamento/ripristino da foglio).
-- Chiusura automatica degli anni passati: totale per categoria conservato per sempre, transazioni di dettaglio eliminate.
-- Sezione Investimenti con percorso di studio, risorse personali e appunti.
+## v1.14.0
+- Eliminazione "morbida" (soft delete) su ogni tab del foglio.
+- Risparmi sincronizzati col foglio Google per la prima volta.
+
+## v1.13.0
+- Categorie (nomi, icone, colori, budget) sincronizzate col foglio Google.
+
+## v1.12.1
+- Le card Entrate/Uscite in Dashboard mostrano l'anno in corso, non più il totale storico.
+
+## v1.12.0
+- Tolta l'opzione "sempre" dal grafico Categorie principali.
+- "Andamento mensile" diventato andamento cumulato del mese in corso.
+- "Aggiusta saldo" in Risparmi.
+
+## v1.10.x
+- Barra di navigazione fissa in basso su telefono, barra laterale su computer.
+- Vari bug di visualizzazione legati alla barra corretti (margine di sicurezza, rimbalzo elastico, stile rimasto da versione precedente).
+
+## Versioni precedenti
+- App base con Dashboard, Transazioni, Categorie, Backup su Google Sheets, chiusura automatica degli anni, tag Viaggio, sezione Risparmi.

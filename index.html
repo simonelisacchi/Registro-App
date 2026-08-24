@@ -25,6 +25,7 @@
 </script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #F7F5F1; overscroll-behavior-y: none; }
   #root { min-height: 100vh; }
@@ -98,7 +99,7 @@ const DEFAULT_CATEGORIES = [
   { id: "altro-i", name: "Altro", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const APP_VERSION = "1.14.0";
+const APP_VERSION = "1.16.0";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
@@ -299,6 +300,14 @@ function App() {
   const [autoClosedYears, setAutoClosedYears] = useState([]);
   const [pendingCount, setPendingCount] = useState(() => loadKey("pending-sync", []).length);
   const [syncFailStreak, setSyncFailStreak] = useState(() => loadKey("sync-fail-streak", 0));
+  const [toastMsg, setToastMsg] = useState(null);
+  const [forcingSync, setForcingSync] = useState(false);
+  const toastTimer = useRef(null);
+  function showToast(message, type = "info") {
+    setToastMsg({ message, type });
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastMsg(null), 3200);
+  }
   const [quickAdd, setQuickAdd] = useState(() => new URLSearchParams(window.location.search).get("add") === "1");
   const categorySyncTimer = useRef(null);
 
@@ -337,114 +346,139 @@ function App() {
     setPendingCount(next.length);
   }
 
+  async function flushQueue() {
+    const url = loadKey("sheet-url", "");
+    if (!url) return;
+    const q = loadKey("pending-sync", []);
+    let sentAny = false;
+    for (const item of q) {
+      try {
+        await fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(item.payload) });
+        queueRemove(item.id);
+        const ts = new Date().toISOString();
+        setLastSync(ts); saveKey("last-sync", ts);
+        sentAny = true;
+      } catch (e) { /* ancora offline, ci riproviamo più tardi */ }
+    }
+    if (sentAny) showToast("Inviato ✓ (era in attesa di rete)", "success");
+  }
+
+  async function checkSyncHealth() {
+    const url = loadKey("sheet-url", "");
+    if (!url) return;
+    try {
+      const res = await fetch(url, { method: "GET" });
+      if (!res.ok) throw new Error("bad status");
+      await res.json();
+      saveKey("sync-fail-streak", 0); setSyncFailStreak(0);
+    } catch (e) {
+      const streak = loadKey("sync-fail-streak", 0) + 1;
+      saveKey("sync-fail-streak", streak); setSyncFailStreak(streak);
+    }
+  }
+
+  async function mergeFromSheet() {
+    const url = loadKey("sheet-url", "");
+    if (!url) return false;
+    try {
+      const res = await fetch(url, { method: "GET" });
+      if (!res.ok) return false;
+      const data = await res.json();
+
+      // Transazioni: aggiungi le nuove, rimuovi quelle segnate come eliminate altrove
+      const localTx = loadKey("transactions", []);
+      const localIds = new Set(localTx.map(t => t.id));
+      let cats = loadKey("categories", DEFAULT_CATEGORIES);
+      const byName = {}; cats.forEach(c => { byName[c.name.trim().toLowerCase()] = c.id; });
+      function ensureCat(name, type) {
+        let id = byName[(name || "").trim().toLowerCase()];
+        if (!id) {
+          const nc = { id: uid(), name: name || "Altro", icon: "🏷️", color: "#8A8578", type: type || "expense", budget: 0 };
+          cats.push(nc); byName[nc.name.toLowerCase()] = nc.id; id = nc.id;
+        }
+        return id;
+      }
+      const archivedYears = new Set((data.archives || []).map(a => a.year));
+      const newOnes = (data.transactions || [])
+        .filter(t => !localIds.has(t.id) && !archivedYears.has(String(t.date).slice(0, 4)))
+        .map(t => ({ id: t.id, type: t.type, amount: parseFloat(t.amount) || 0, categoryId: ensureCat(t.categoryName, t.type), date: t.date, note: t.note || "", trip: t.trip || "" }));
+      const deletedTxIds = new Set(data.deletedTransactionIds || []);
+      let mergedTx = [...newOnes, ...localTx];
+      let txChanged = newOnes.length > 0;
+      if (deletedTxIds.size > 0) {
+        const before = mergedTx.length;
+        mergedTx = mergedTx.filter(t => !deletedTxIds.has(t.id));
+        if (mergedTx.length !== before) txChanged = true;
+      }
+      if (txChanged) { setTransactions(mergedTx); saveKey("transactions", mergedTx); }
+
+      // Categorie: aggiungi/aggiorna, rimuovi quelle segnate come eliminate altrove
+      let catsChanged = false;
+      if (Array.isArray(data.categories)) {
+        const byId = Object.fromEntries(cats.map(c => [c.id, c]));
+        data.categories.forEach(rc => {
+          const incoming = { id: rc.id, name: rc.name, icon: rc.icon, color: rc.color, type: rc.type, budget: parseFloat(rc.budget) || 0 };
+          const existing = byId[rc.id];
+          if (!existing) { cats.push(incoming); byId[rc.id] = incoming; catsChanged = true; }
+          else if (existing.name !== incoming.name || existing.icon !== incoming.icon || existing.color !== incoming.color || existing.type !== incoming.type || (existing.budget || 0) !== incoming.budget) {
+            Object.assign(existing, incoming); catsChanged = true;
+          }
+        });
+      }
+      const deletedCatIds = new Set(data.deletedCategoryIds || []);
+      if (deletedCatIds.size > 0) {
+        const before = cats.length;
+        cats = cats.filter(c => !deletedCatIds.has(c.id));
+        if (cats.length !== before) catsChanged = true;
+      }
+      if (catsChanged) { setCategories(cats); saveKey("categories", cats); }
+
+      // Risparmi: aggiungi i nuovi, rimuovi quelli segnati come eliminati altrove
+      const localSav = loadKey("savings", []);
+      const localSavIds = new Set(localSav.map(s => s.id));
+      const newSavings = (data.savings || [])
+        .filter(s => !localSavIds.has(s.id))
+        .map(s => ({ id: s.id, type: s.type, amount: parseFloat(s.amount) || 0, date: s.date, note: s.note || "" }));
+      const deletedSavIds = new Set(data.deletedSavingIds || []);
+      let mergedSav = [...newSavings, ...localSav];
+      let savChanged = newSavings.length > 0;
+      if (deletedSavIds.size > 0) {
+        const before = mergedSav.length;
+        mergedSav = mergedSav.filter(s => !deletedSavIds.has(s.id));
+        if (mergedSav.length !== before) savChanged = true;
+      }
+      if (savChanged) { setSavings(mergedSav); saveKey("savings", mergedSav); }
+
+      const ts = new Date().toISOString();
+      setLastPull(ts); saveKey("last-pull", ts);
+      const changed = txChanged || catsChanged || savChanged;
+      if (changed) showToast("Aggiornato da un altro dispositivo ✓", "success");
+      return changed;
+    } catch (e) { return false; }
+  }
+
+  async function forceSyncNow() {
+    if (!sheetUrl) { showToast("Nessun foglio collegato", "warn"); return; }
+    setForcingSync(true);
+    try {
+      await flushQueue();
+      await pushToSheet({ action: "bulk", txs: transactions.map(t => ({ ...t, categoryName: catMap[t.categoryId]?.name || t.categoryId })) });
+      pushCategoriesToSheet(categories);
+      const changed = await mergeFromSheet();
+      await checkSyncHealth();
+      if (!changed) showToast("Sincronizzato ✓ (tutto già aggiornato)", "success");
+    } catch (e) {
+      showToast("Sincronizzazione non riuscita", "error");
+    }
+    setForcingSync(false);
+  }
+
   // Riprova a inviare al foglio ciò che non era partito per mancanza di rete: al primo avvio
   // e ogni volta che il dispositivo torna online.
   useEffect(() => {
-    async function flushQueue() {
-      const url = loadKey("sheet-url", "");
-      if (!url) return;
-      const q = loadKey("pending-sync", []);
-      for (const item of q) {
-        try {
-          await fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(item.payload) });
-          queueRemove(item.id);
-          const ts = new Date().toISOString();
-          setLastSync(ts); saveKey("last-sync", ts);
-        } catch (e) { /* ancora offline, ci riproviamo più tardi */ }
-      }
-    }
     flushQueue();
     window.addEventListener("online", flushQueue);
-    async function checkSyncHealth() {
-      const url = loadKey("sheet-url", "");
-      if (!url) return;
-      try {
-        const res = await fetch(url, { method: "GET" });
-        if (!res.ok) throw new Error("bad status");
-        await res.json();
-        saveKey("sync-fail-streak", 0); setSyncFailStreak(0);
-      } catch (e) {
-        const streak = loadKey("sync-fail-streak", 0) + 1;
-        saveKey("sync-fail-streak", streak); setSyncFailStreak(streak);
-      }
-    }
     checkSyncHealth();
-    async function mergeFromSheet() {
-      const url = loadKey("sheet-url", "");
-      if (!url) return;
-      try {
-        const res = await fetch(url, { method: "GET" });
-        if (!res.ok) return;
-        const data = await res.json();
-
-        // Transazioni: aggiungi le nuove, rimuovi quelle segnate come eliminate altrove
-        const localTx = loadKey("transactions", []);
-        const localIds = new Set(localTx.map(t => t.id));
-        let cats = loadKey("categories", DEFAULT_CATEGORIES);
-        const byName = {}; cats.forEach(c => { byName[c.name.trim().toLowerCase()] = c.id; });
-        function ensureCat(name, type) {
-          let id = byName[(name || "").trim().toLowerCase()];
-          if (!id) {
-            const nc = { id: uid(), name: name || "Altro", icon: "🏷️", color: "#8A8578", type: type || "expense", budget: 0 };
-            cats.push(nc); byName[nc.name.toLowerCase()] = nc.id; id = nc.id;
-          }
-          return id;
-        }
-        const archivedYears = new Set((data.archives || []).map(a => a.year));
-        const newOnes = (data.transactions || [])
-          .filter(t => !localIds.has(t.id) && !archivedYears.has(String(t.date).slice(0, 4)))
-          .map(t => ({ id: t.id, type: t.type, amount: parseFloat(t.amount) || 0, categoryId: ensureCat(t.categoryName, t.type), date: t.date, note: t.note || "", trip: t.trip || "" }));
-        const deletedTxIds = new Set(data.deletedTransactionIds || []);
-        let mergedTx = [...newOnes, ...localTx];
-        let txChanged = newOnes.length > 0;
-        if (deletedTxIds.size > 0) {
-          const before = mergedTx.length;
-          mergedTx = mergedTx.filter(t => !deletedTxIds.has(t.id));
-          if (mergedTx.length !== before) txChanged = true;
-        }
-        if (txChanged) { setTransactions(mergedTx); saveKey("transactions", mergedTx); }
-
-        // Categorie: aggiungi/aggiorna, rimuovi quelle segnate come eliminate altrove
-        let catsChanged = false;
-        if (Array.isArray(data.categories)) {
-          const byId = Object.fromEntries(cats.map(c => [c.id, c]));
-          data.categories.forEach(rc => {
-            const incoming = { id: rc.id, name: rc.name, icon: rc.icon, color: rc.color, type: rc.type, budget: parseFloat(rc.budget) || 0 };
-            const existing = byId[rc.id];
-            if (!existing) { cats.push(incoming); byId[rc.id] = incoming; catsChanged = true; }
-            else if (existing.name !== incoming.name || existing.icon !== incoming.icon || existing.color !== incoming.color || existing.type !== incoming.type || (existing.budget || 0) !== incoming.budget) {
-              Object.assign(existing, incoming); catsChanged = true;
-            }
-          });
-        }
-        const deletedCatIds = new Set(data.deletedCategoryIds || []);
-        if (deletedCatIds.size > 0) {
-          const before = cats.length;
-          cats = cats.filter(c => !deletedCatIds.has(c.id));
-          if (cats.length !== before) catsChanged = true;
-        }
-        if (catsChanged) { setCategories(cats); saveKey("categories", cats); }
-
-        // Risparmi: aggiungi i nuovi, rimuovi quelli segnati come eliminati altrove
-        const localSav = loadKey("savings", []);
-        const localSavIds = new Set(localSav.map(s => s.id));
-        const newSavings = (data.savings || [])
-          .filter(s => !localSavIds.has(s.id))
-          .map(s => ({ id: s.id, type: s.type, amount: parseFloat(s.amount) || 0, date: s.date, note: s.note || "" }));
-        const deletedSavIds = new Set(data.deletedSavingIds || []);
-        let mergedSav = [...newSavings, ...localSav];
-        let savChanged = newSavings.length > 0;
-        if (deletedSavIds.size > 0) {
-          const before = mergedSav.length;
-          mergedSav = mergedSav.filter(s => !deletedSavIds.has(s.id));
-          if (mergedSav.length !== before) savChanged = true;
-        }
-        if (savChanged) { setSavings(mergedSav); saveKey("savings", mergedSav); }
-
-        const ts = new Date().toISOString();
-        setLastPull(ts); saveKey("last-pull", ts);
-      } catch (e) { /* prossimo giro va meglio */ }
-    }
     mergeFromSheet();
     const interval = setInterval(() => { flushQueue(); checkSyncHealth(); mergeFromSheet(); }, 5 * 60 * 1000); // sincronizzazione e controllo automatici ogni 5 minuti, oltre a quello immediato a ogni transazione
     return () => { window.removeEventListener("online", flushQueue); clearInterval(interval); };
@@ -502,9 +536,11 @@ function App() {
       });
       const ts = new Date().toISOString();
       setLastSync(ts); saveKey("last-sync", ts);
+      showToast("Sincronizzato ✓", "success");
     } catch (e) {
       console.error("sync error, messo in coda per riprovare al ritorno della rete", e);
       queueAdd(payload);
+      showToast("Salvato — in attesa di rete", "warn");
     }
   }
 
@@ -726,8 +762,25 @@ function App() {
           <div style={S.headerBalance}>
             <span style={S.headerBalanceLabel}>saldo</span>
             <span style={{ ...S.headerBalanceNum, color: balance >= 0 ? TOKENS.accent : TOKENS.negative }}>{eur(balance)}</span>
+            {sheetUrl && (
+              <button onClick={forceSyncNow} disabled={forcingSync} style={{ border: "none", background: "none", color: TOKENS.inkSoft, fontSize: 11.5, marginTop: 4, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
+                <span style={{ display: "inline-block", animation: forcingSync ? "spin 0.9s linear infinite" : "none" }}>⟳</span> {forcingSync ? "sincronizzo…" : "sincronizza ora"}
+              </button>
+            )}
           </div>
         </header>
+
+        {toastMsg && (
+          <div style={{
+            position: "fixed", top: "calc(14px + env(safe-area-inset-top))", left: "50%", transform: "translateX(-50%)",
+            zIndex: 45, padding: "8px 16px", borderRadius: 999, fontSize: 12.5, fontWeight: 500,
+            background: toastMsg.type === "error" ? TOKENS.negative : toastMsg.type === "warn" ? TOKENS.amber : TOKENS.ink,
+            color: "#fff", boxShadow: "0 4px 14px rgba(33,31,28,0.25)", whiteSpace: "nowrap", maxWidth: "90vw",
+            overflow: "hidden", textOverflow: "ellipsis",
+          }}>
+            {toastMsg.message}
+          </div>
+        )}
 
         <div className="layout-row">
         <nav className="tabs-nav">
@@ -1173,6 +1226,8 @@ function Categorie({ categories, transactions, archives, onAdd, onUpdate, onRemo
   const [yearToClose, setYearToClose] = useState("");
   const [yearToFix, setYearToFix] = useState("");
   const [incomeFix, setIncomeFix] = useState("");
+  const [openCloseYear, setOpenCloseYear] = useState(false);
+  const [openFixIncome, setOpenFixIncome] = useState(false);
 
   const liveYears = useMemo(() => {
     const ys = new Set(transactions.map(t => t.date.slice(0, 4)));
@@ -1271,43 +1326,57 @@ function Categorie({ categories, transactions, archives, onAdd, onUpdate, onRemo
       </div>
 
       <div style={S.card}>
-        <h3 style={S.sectionTitle}>Chiudi un anno</h3>
-        <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, lineHeight: 1.6, margin: "0 0 12px" }}>
-          Gli anni ormai passati vengono chiusi da soli al primo avvio dell'app nell'anno nuovo: Registro calcola il totale per categoria (la tabella qui sopra), lo conserva per sempre, e cancella le singole transazioni per non appesantire l'app e il foglio di backup. Da qui puoi anche chiudere manualmente un anno in anticipo, se vuoi.
-        </p>
-        {closableYears.length === 0 ? (
-          <p style={{ color: TOKENS.inkSoft, fontSize: 13.5 }}>Non ci sono anni con transazioni da chiudere al momento.</p>
-        ) : (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <select value={yearToClose} onChange={e=>setYearToClose(e.target.value)} style={inputStyle}>
-              <option value="">Scegli l'anno…</option>
-              {closableYears.map(y => <option key={y} value={y}>{y}{y === String(new Date().getFullYear()) ? " (in corso)" : ""}</option>)}
-            </select>
-            <button onClick={()=>{ if(yearToClose){ onCloseYear(yearToClose); setYearToClose(""); } }} disabled={!yearToClose}
-              style={{ ...btnPrimary, background: TOKENS.negative }}>
-              🔒 Chiudi e archivia
-            </button>
+        <button onClick={()=>setOpenCloseYear(o=>!o)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+          <h3 style={{ ...S.sectionTitle, margin: 0 }}>Chiudi un anno</h3>
+          <span style={{ transform: openCloseYear ? "rotate(180deg)" : "none", transition: "transform .2s", color: TOKENS.inkSoft, display: "inline-block" }}>▾</span>
+        </button>
+        {openCloseYear && (
+          <div style={{ marginTop: 14 }}>
+            <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, lineHeight: 1.6, margin: "0 0 12px" }}>
+              Gli anni ormai passati vengono chiusi da soli al primo avvio dell'app nell'anno nuovo: Registro calcola il totale per categoria (la tabella qui sopra), lo conserva per sempre, e cancella le singole transazioni per non appesantire l'app e il foglio di backup. Da qui puoi anche chiudere manualmente un anno in anticipo, se vuoi.
+            </p>
+            {closableYears.length === 0 ? (
+              <p style={{ color: TOKENS.inkSoft, fontSize: 13.5 }}>Non ci sono anni con transazioni da chiudere al momento.</p>
+            ) : (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <select value={yearToClose} onChange={e=>setYearToClose(e.target.value)} style={inputStyle}>
+                  <option value="">Scegli l'anno…</option>
+                  {closableYears.map(y => <option key={y} value={y}>{y}{y === String(new Date().getFullYear()) ? " (in corso)" : ""}</option>)}
+                </select>
+                <button onClick={()=>{ if(yearToClose){ onCloseYear(yearToClose); setYearToClose(""); } }} disabled={!yearToClose}
+                  style={{ ...btnPrimary, background: TOKENS.negative }}>
+                  🔒 Chiudi e archivia
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {archives.length > 0 && (
         <div style={S.card}>
-          <h3 style={S.sectionTitle}>Correggi le entrate di un anno archiviato</h3>
-          <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, lineHeight: 1.6, margin: "0 0 12px" }}>
-            Per gli anni chiusi prima di questa versione, o importati da un'altra fonte, le entrate potrebbero mancare (impostate a zero) — cosa che rende il saldo totale in alto poco preciso. Se conosci l'entrata reale di quell'anno, correggila qui.
-          </p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <select value={yearToFix} onChange={e=>{ setYearToFix(e.target.value); const a = archives.find(x=>x.year===e.target.value); setIncomeFix(a ? String(a.totalIncome || "") : ""); }} style={inputStyle}>
-              <option value="">Scegli l'anno…</option>
-              {archives.map(a => <option key={a.year} value={a.year}>{a.year} (entrate attuali: {eur(a.totalIncome || 0)})</option>)}
-            </select>
-            <input type="number" min="0" step="0.01" value={incomeFix} onChange={e=>setIncomeFix(e.target.value)} placeholder="entrate reali €" style={{ ...inputStyle, maxWidth: 160 }} disabled={!yearToFix} />
-            <button onClick={()=>{ if(yearToFix){ onEditArchiveIncome(yearToFix, parseFloat(incomeFix) || 0); setYearToFix(""); setIncomeFix(""); } }} disabled={!yearToFix}
-              style={btnPrimary}>
-              <span>✓</span> Salva
-            </button>
-          </div>
+          <button onClick={()=>setOpenFixIncome(o=>!o)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+            <h3 style={{ ...S.sectionTitle, margin: 0 }}>Correggi le entrate di un anno archiviato</h3>
+            <span style={{ transform: openFixIncome ? "rotate(180deg)" : "none", transition: "transform .2s", color: TOKENS.inkSoft, display: "inline-block" }}>▾</span>
+          </button>
+          {openFixIncome && (
+            <div style={{ marginTop: 14 }}>
+              <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, lineHeight: 1.6, margin: "0 0 12px" }}>
+                Per gli anni chiusi prima di questa versione, o importati da un'altra fonte, le entrate potrebbero mancare (impostate a zero) — cosa che rende il saldo totale in alto poco preciso. Se conosci l'entrata reale di quell'anno, correggila qui.
+              </p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <select value={yearToFix} onChange={e=>{ setYearToFix(e.target.value); const a = archives.find(x=>x.year===e.target.value); setIncomeFix(a ? String(a.totalIncome || "") : ""); }} style={inputStyle}>
+                  <option value="">Scegli l'anno…</option>
+                  {archives.map(a => <option key={a.year} value={a.year}>{a.year} (entrate attuali: {eur(a.totalIncome || 0)})</option>)}
+                </select>
+                <input type="number" min="0" step="0.01" value={incomeFix} onChange={e=>setIncomeFix(e.target.value)} placeholder="entrate reali €" style={{ ...inputStyle, maxWidth: 160 }} disabled={!yearToFix} />
+                <button onClick={()=>{ if(yearToFix){ onEditArchiveIncome(yearToFix, parseFloat(incomeFix) || 0); setYearToFix(""); setIncomeFix(""); } }} disabled={!yearToFix}
+                  style={btnPrimary}>
+                  <span>✓</span> Salva
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>
@@ -1375,24 +1444,38 @@ function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onS
           <h3 style={{ ...S.sectionTitle, margin: 0 }}>{sheetUrl ? "Collegato a Google Sheets" : "Non ancora collegato"}</h3>
         </div>
         <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, lineHeight: 1.6, margin: "6px 0 14px" }}>
-          Ogni transazione nuova si invia da sola quando la aggiungi, e ogni 5 minuti l'app controlla il foglio e aggiunge in automatico quelle inserite da un altro dispositivo — utile se usi telefono e computer nella stessa giornata. Modifiche ed eliminazioni fatte altrove, invece, non si propagano da sole: per quelle usa "Carica da questo foglio" qui sotto, che sostituisce tutto con l'ultima versione del foglio.
+          <b>Automatico, non serve fare nulla:</b> ogni transazione, categoria o risparmio che aggiungi, modifichi o elimini si invia da solo al foglio; ogni 5 minuti l'app controlla anche cosa è cambiato sugli altri dispositivi e si allinea da sola.
         </p>
         <Field label="URL dell'Apps Script (Web App)">
           <input value={draft} onChange={e=>setDraft(e.target.value)} placeholder="https://script.google.com/macros/s/…/exec" style={inputStyle} />
         </Field>
-        <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+        <div style={{ marginTop: 10 }}>
           <button onClick={()=>onSaveUrl(draft.trim())} style={btnPrimary}><span>✓</span> Salva collegamento</button>
-          {sheetUrl && (
-            <button onClick={onSyncAll} disabled={syncing} style={{ ...btnPrimary, background: TOKENS.paper2, color: TOKENS.ink }}>
-              <span>⟳</span> {syncing ? "Sincronizzo…" : `Invia tutto al foglio (${count})`}
-            </button>
-          )}
-          {sheetUrl && (
-            <button onClick={onPull} disabled={pulling} style={{ ...btnPrimary, background: TOKENS.amberSoft, color: TOKENS.ink }}>
-              <span>⬇</span> {pulling ? "Carico…" : "Carica da questo foglio"}
-            </button>
-          )}
         </div>
+
+        {sheetUrl && (
+          <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${TOKENS.line}` }}>
+            <p style={{ fontSize: 11, letterSpacing: 1, color: TOKENS.inkSoft, fontFamily: "'IBM Plex Mono', monospace", margin: "0 0 10px" }}>AZIONI MANUALI — di solito non servono</p>
+
+            <div style={{ marginBottom: 14 }}>
+              <button onClick={onSyncAll} disabled={syncing} style={{ ...btnPrimary, background: TOKENS.paper2, color: TOKENS.ink }}>
+                <span>⟳</span> {syncing ? "Invio…" : `Invia tutto al foglio (${count})`}
+              </button>
+              <p style={{ fontSize: 12.5, color: TOKENS.inkSoft, margin: "6px 0 0", lineHeight: 1.5 }}>
+                Rispedisce tutte le transazioni di questo dispositivo (senza creare doppioni). Usalo solo se sospetti che qualcosa non sia mai arrivato sul foglio — l'invio normale è già automatico ad ogni aggiunta.
+              </p>
+            </div>
+
+            <div>
+              <button onClick={onPull} disabled={pulling} style={{ ...btnPrimary, background: TOKENS.amberSoft, color: TOKENS.ink }}>
+                <span>⬇</span> {pulling ? "Carico…" : "Carica tutto dal foglio"}
+              </button>
+              <p style={{ fontSize: 12.5, color: TOKENS.inkSoft, margin: "6px 0 0", lineHeight: 1.5 }}>
+                <b>Sostituisce</b> tutti i dati di questo dispositivo con quelli del foglio. Usalo su un dispositivo nuovo appena collegato, per portarci subito lo storico esistente — oppure se vuoi essere sicuro di essere allineato subito, senza aspettare il controllo automatico dei 5 minuti.
+              </p>
+            </div>
+          </div>
+        )}
         {sheetUrl && (
           <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 10, fontFamily: "'IBM Plex Mono', monospace" }}>
             ultimo invio: {timeAgo(lastSync)} · ultimo caricamento: {timeAgo(lastPull)}
@@ -1442,7 +1525,7 @@ function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onS
               </button>
             </div>
             <p style={{ fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.6, marginTop: 4 }}>
-              Nota: l'URL dà lettura e scrittura su quel foglio a chiunque lo conosca — non condividerlo. "Invia tutto al foglio" spedisce le transazioni evitando duplicati; "Carica da questo foglio" fa il percorso inverso e sostituisce i dati locali, utile appena apri l'app su un nuovo dispositivo.
+              Nota: l'URL dà lettura e scrittura su quel foglio a chiunque lo conosca — non condividerlo. "Invia tutto al foglio" spedisce le transazioni evitando duplicati; "Carica tutto dal foglio" fa il percorso inverso e sostituisce i dati locali, utile appena apri l'app su un nuovo dispositivo.
             </p>
             <p style={{ fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.6, marginTop: 0 }}>
               Per tenerlo leggero nel tempo, ci sono due livelli: lo script crea da solo un tab per anno (2026, 2027…) invece di un unico elenco infinito; e quando in Categorie usi "Chiudi un anno", quel tab con le transazioni sparisce del tutto dal foglio e resta solo una riga di totale per categoria nel tab "Archivio" — permanente, leggerissimo, per sempre.

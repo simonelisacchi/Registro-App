@@ -98,7 +98,7 @@ const DEFAULT_CATEGORIES = [
   { id: "altro-i", name: "Altro", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const APP_VERSION = "1.10.5";
+const APP_VERSION = "1.11.0";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
@@ -167,6 +167,7 @@ function doPost(e) {
     (body.categories || []).forEach(function(c) {
       arch.appendRow([year, c.name, c.total]);
     });
+    arch.appendRow([year, '__Entrate__', body.totalIncome || 0]);
     var yearSheet = ss.getSheetByName(year);
     if (yearSheet) ss.deleteSheet(yearSheet);
   }
@@ -190,13 +191,15 @@ function doGet(e) {
   var arch = ss.getSheetByName('Archivio');
   if (arch && arch.getLastRow() > 1) {
     var byYear = {};
+    var incomeByYear = {};
     arch.getDataRange().getValues().slice(1).forEach(function(r) {
       var y = String(r[0]);
+      if (r[1] === '__Entrate__') { incomeByYear[y] = r[2]; return; }
       if (!byYear[y]) byYear[y] = {};
       byYear[y][r[1]] = r[2];
     });
     Object.keys(byYear).forEach(function(y) {
-      out.archives.push({ year: y, categoryTotals: byYear[y] });
+      out.archives.push({ year: y, categoryTotals: byYear[y], income: incomeByYear[y] || 0 });
     });
   }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
@@ -381,7 +384,7 @@ function App() {
         if (url) {
           const catsPayload = Object.entries(totals).map(([id, total]) => ({ name: catById[id]?.name || names[id]?.name || "Altro", total }));
           try {
-            await fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "closeYear", year, categories: catsPayload }) });
+            await fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "closeYear", year, categories: catsPayload, totalIncome }) });
           } catch (e) { console.error("auto-close sync error", e); }
         }
       }
@@ -499,7 +502,8 @@ function App() {
           categoryNames[id] = { name, icon: newCats.find(c => c.id === id)?.icon || "🏷️" };
         });
         const totalExpense = Object.values(categoryTotals).reduce((s, v) => s + v, 0);
-        return { year: a.year, categoryTotals, categoryNames, totalIncome: 0, totalExpense, saldo: -totalExpense, closedAt: new Date().toISOString() };
+        const totalIncome = parseFloat(a.income) || 0;
+        return { year: a.year, categoryTotals, categoryNames, totalIncome, totalExpense, saldo: totalIncome - totalExpense, closedAt: new Date().toISOString() };
       });
       setCategories(newCats); saveKey("categories", newCats);
       setTransactions(mapped); saveKey("transactions", mapped);
@@ -513,6 +517,16 @@ function App() {
     setPulling(false);
   }
   function saveSheetUrl(url) { setSheetUrlState(url); saveKey("sheet-url", url); }
+
+  async function setArchiveIncome(year, income) {
+    const next = archives.map(a => a.year === year ? { ...a, totalIncome: income, saldo: income - a.totalExpense } : a);
+    setArchives(next); saveKey("archives", next);
+    const a = next.find(x => x.year === year);
+    if (a) {
+      const catsPayload = Object.entries(a.categoryTotals).map(([id, total]) => ({ name: a.categoryNames[id]?.name || "Altro", total }));
+      await pushToSheet({ action: "closeYear", year, categories: catsPayload, totalIncome: income });
+    }
+  }
 
   async function closeYear(year) {
     const inArchive = archives.some(a => a.year === year);
@@ -537,7 +551,7 @@ function App() {
     setTransactions(remaining); saveKey("transactions", remaining);
 
     const catsPayload = Object.entries(totals).map(([id, total]) => ({ name: catMap[id]?.name || names[id]?.name || "Altro", total }));
-    await pushToSheet({ action: "closeYear", year, categories: catsPayload });
+    await pushToSheet({ action: "closeYear", year, categories: catsPayload, totalIncome });
   }
 
   function addCategory(cat) {
@@ -610,7 +624,7 @@ function App() {
           )}
           {tab === "dashboard" && <Dashboard transactions={transactions} categories={categories} catMap={catMap} archives={archives} />}
           {tab === "transazioni" && <Transazioni transactions={transactions} categories={categories} catMap={catMap} onAdd={addTransaction} onRemove={removeTransaction} onUpdate={updateTransaction} existingTrips={existingTrips} />}
-          {tab === "categorie" && <Categorie categories={categories} transactions={transactions} archives={archives} onAdd={addCategory} onUpdate={updateCategory} onRemove={removeCategory} onCloseYear={closeYear} />}
+          {tab === "categorie" && <Categorie categories={categories} transactions={transactions} archives={archives} onAdd={addCategory} onUpdate={updateCategory} onRemove={removeCategory} onCloseYear={closeYear} onEditArchiveIncome={setArchiveIncome} />}
           {tab === "risparmi" && <Risparmi savings={savings} onAdd={addSaving} onRemove={removeSaving} />}
           {tab === "backup" && <Backup sheetUrl={sheetUrl} onSaveUrl={saveSheetUrl} lastSync={lastSync} lastPull={lastPull} syncing={syncing} pulling={pulling} onSyncAll={syncAllNow} onPull={pullFromSheet} count={transactions.length} pendingCount={pendingCount} syncFailStreak={syncFailStreak} onExport={exportBackup} onImportFile={importBackupFile} />}
         </main>
@@ -1011,10 +1025,12 @@ function TxForm({ categories, onSubmit, initial, onCancel, existingTrips = [] })
 
 /* ---------- Categorie ---------- */
 
-function Categorie({ categories, transactions, archives, onAdd, onUpdate, onRemove, onCloseYear }) {
+function Categorie({ categories, transactions, archives, onAdd, onUpdate, onRemove, onCloseYear, onEditArchiveIncome }) {
   const [showForm, setShowForm] = useState(false);
   const [confirmId, setConfirmId] = useState(null);
   const [yearToClose, setYearToClose] = useState("");
+  const [yearToFix, setYearToFix] = useState("");
+  const [incomeFix, setIncomeFix] = useState("");
 
   const liveYears = useMemo(() => {
     const ys = new Set(transactions.map(t => t.date.slice(0, 4)));
@@ -1132,6 +1148,26 @@ function Categorie({ categories, transactions, archives, onAdd, onUpdate, onRemo
           </div>
         )}
       </div>
+
+      {archives.length > 0 && (
+        <div style={S.card}>
+          <h3 style={S.sectionTitle}>Correggi le entrate di un anno archiviato</h3>
+          <p style={{ color: TOKENS.inkSoft, fontSize: 13.5, lineHeight: 1.6, margin: "0 0 12px" }}>
+            Per gli anni chiusi prima di questa versione, o importati da un'altra fonte, le entrate potrebbero mancare (impostate a zero) — cosa che rende il saldo totale in alto poco preciso. Se conosci l'entrata reale di quell'anno, correggila qui.
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <select value={yearToFix} onChange={e=>{ setYearToFix(e.target.value); const a = archives.find(x=>x.year===e.target.value); setIncomeFix(a ? String(a.totalIncome || "") : ""); }} style={inputStyle}>
+              <option value="">Scegli l'anno…</option>
+              {archives.map(a => <option key={a.year} value={a.year}>{a.year} (entrate attuali: {eur(a.totalIncome || 0)})</option>)}
+            </select>
+            <input type="number" min="0" step="0.01" value={incomeFix} onChange={e=>setIncomeFix(e.target.value)} placeholder="entrate reali €" style={{ ...inputStyle, maxWidth: 160 }} disabled={!yearToFix} />
+            <button onClick={()=>{ if(yearToFix){ onEditArchiveIncome(yearToFix, parseFloat(incomeFix) || 0); setYearToFix(""); setIncomeFix(""); } }} disabled={!yearToFix}
+              style={btnPrimary}>
+              <span>✓</span> Salva
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

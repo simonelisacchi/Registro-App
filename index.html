@@ -98,15 +98,23 @@ const DEFAULT_CATEGORIES = [
   { id: "altro-i", name: "Altro", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const APP_VERSION = "1.12.0";
+const APP_VERSION = "1.14.0";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
   if (!sheet) {
     sheet = ss.insertSheet(year);
-    sheet.appendRow(['ID','Tipo','Importo','Categoria','Data','Nota','Viaggio']);
+    sheet.appendRow(['ID','Tipo','Importo','Categoria','Data','Nota','Viaggio','Eliminato']);
   }
   return sheet;
+}
+
+function markDeletedById(sheet, id, col) {
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === id) { sheet.getRange(i + 1, col).setValue(true); return true; }
+  }
+  return false;
 }
 
 function doPost(e) {
@@ -116,28 +124,22 @@ function doPost(e) {
   if (body.action === 'append') {
     var t = body.tx;
     var sheet = getSheetForDate(ss, t.date);
-    sheet.appendRow([t.id, t.type, t.amount, t.categoryName, t.date, t.note || '', t.trip || '']);
+    sheet.appendRow([t.id, t.type, t.amount, t.categoryName, t.date, t.note || '', t.trip || '', false]);
 
   } else if (body.action === 'delete') {
     ss.getSheets().forEach(function(sheet) {
       if (!/^\\d{4}$/.test(sheet.getName())) return;
-      var data = sheet.getDataRange().getValues();
-      for (var i = data.length - 1; i >= 1; i--) {
-        if (data[i][0] === body.id) { sheet.deleteRow(i + 1); break; }
-      }
+      markDeletedById(sheet, body.id, 8);
     });
 
   } else if (body.action === 'update') {
     ss.getSheets().forEach(function(sheet) {
       if (!/^\\d{4}$/.test(sheet.getName())) return;
-      var data = sheet.getDataRange().getValues();
-      for (var i = data.length - 1; i >= 1; i--) {
-        if (data[i][0] === body.id) { sheet.deleteRow(i + 1); break; }
-      }
+      markDeletedById(sheet, body.id, 8);
     });
     var ut = body.tx;
     var usheet = getSheetForDate(ss, ut.date);
-    usheet.appendRow([ut.id, ut.type, ut.amount, ut.categoryName, ut.date, ut.note || '', ut.trip || '']);
+    usheet.appendRow([ut.id, ut.type, ut.amount, ut.categoryName, ut.date, ut.note || '', ut.trip || '', false]);
 
   } else if (body.action === 'bulk') {
     var byYear = {};
@@ -151,7 +153,7 @@ function doPost(e) {
       var existing = sheet.getDataRange().getValues().slice(1).map(function(r){ return r[0]; });
       byYear[y].forEach(function(t) {
         if (existing.indexOf(t.id) === -1) {
-          sheet.appendRow([t.id, t.type, t.amount, t.categoryName, t.date, t.note || '', t.trip || '']);
+          sheet.appendRow([t.id, t.type, t.amount, t.categoryName, t.date, t.note || '', t.trip || '', false]);
         }
       });
     });
@@ -170,6 +172,32 @@ function doPost(e) {
     arch.appendRow([year, '__Entrate__', body.totalIncome || 0]);
     var yearSheet = ss.getSheetByName(year);
     if (yearSheet) ss.deleteSheet(yearSheet);
+
+  } else if (body.action === 'categoriesSync') {
+    var csheet = ss.getSheetByName('Categorie') || ss.insertSheet('Categorie');
+    if (csheet.getLastRow() === 0) csheet.appendRow(['ID', 'Nome', 'Icona', 'Colore', 'Tipo', 'Budget', 'Eliminato']);
+    var cdata = csheet.getDataRange().getValues();
+    var idRow = {};
+    for (var ci = 1; ci < cdata.length; ci++) idRow[cdata[ci][0]] = ci + 1;
+    (body.categories || []).forEach(function(c) {
+      var row = [c.id, c.name, c.icon, c.color, c.type, c.budget || 0, false];
+      if (idRow[c.id]) csheet.getRange(idRow[c.id], 1, 1, 7).setValues([row]);
+      else { csheet.appendRow(row); idRow[c.id] = csheet.getLastRow(); }
+    });
+
+  } else if (body.action === 'categoryDelete') {
+    var csheet2 = ss.getSheetByName('Categorie');
+    if (csheet2) markDeletedById(csheet2, body.id, 7);
+
+  } else if (body.action === 'savingAppend') {
+    var ssheet = ss.getSheetByName('Risparmi') || ss.insertSheet('Risparmi');
+    if (ssheet.getLastRow() === 0) ssheet.appendRow(['ID', 'Tipo', 'Importo', 'Data', 'Nota', 'Eliminato']);
+    var sv = body.saving;
+    ssheet.appendRow([sv.id, sv.type, sv.amount, sv.date, sv.note || '', false]);
+
+  } else if (body.action === 'savingDelete') {
+    var ssheet2 = ss.getSheetByName('Risparmi');
+    if (ssheet2) markDeletedById(ssheet2, body.id, 6);
   }
   return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
 }
@@ -177,17 +205,20 @@ function doPost(e) {
 function doGet(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var tz = Session.getScriptTimeZone();
-  var out = { transactions: [], archives: [] };
+  var out = { transactions: [], archives: [], categories: [], savings: [], deletedTransactionIds: [], deletedCategoryIds: [], deletedSavingIds: [] };
+
   ss.getSheets().forEach(function(sheet) {
     if (!/^\\d{4}$/.test(sheet.getName())) return;
     if (sheet.getLastRow() <= 1) return;
     var rows = sheet.getDataRange().getValues().slice(1);
     rows.forEach(function(r) {
+      if (r[7] === true) { out.deletedTransactionIds.push(r[0]); return; }
       var d = r[4];
       var dateStr = (d instanceof Date) ? Utilities.formatDate(d, tz, 'yyyy-MM-dd') : String(d);
       out.transactions.push({ id: r[0], type: r[1], amount: r[2], categoryName: r[3], date: dateStr, note: r[5] || '', trip: r[6] || '' });
     });
   });
+
   var arch = ss.getSheetByName('Archivio');
   if (arch && arch.getLastRow() > 1) {
     var byYear = {};
@@ -202,6 +233,25 @@ function doGet(e) {
       out.archives.push({ year: y, categoryTotals: byYear[y], income: incomeByYear[y] || 0 });
     });
   }
+
+  var csheet3 = ss.getSheetByName('Categorie');
+  if (csheet3 && csheet3.getLastRow() > 1) {
+    csheet3.getDataRange().getValues().slice(1).forEach(function(r) {
+      if (r[6] === true) { out.deletedCategoryIds.push(r[0]); return; }
+      out.categories.push({ id: r[0], name: r[1], icon: r[2], color: r[3], type: r[4], budget: r[5] || 0 });
+    });
+  }
+
+  var ssheet3 = ss.getSheetByName('Risparmi');
+  if (ssheet3 && ssheet3.getLastRow() > 1) {
+    ssheet3.getDataRange().getValues().slice(1).forEach(function(r) {
+      if (r[5] === true) { out.deletedSavingIds.push(r[0]); return; }
+      var sd = r[3];
+      var sdateStr = (sd instanceof Date) ? Utilities.formatDate(sd, tz, 'yyyy-MM-dd') : String(sd);
+      out.savings.push({ id: r[0], type: r[1], amount: r[2], date: sdateStr, note: r[4] || '' });
+    });
+  }
+
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }`;
 
@@ -250,6 +300,7 @@ function App() {
   const [pendingCount, setPendingCount] = useState(() => loadKey("pending-sync", []).length);
   const [syncFailStreak, setSyncFailStreak] = useState(() => loadKey("sync-fail-streak", 0));
   const [quickAdd, setQuickAdd] = useState(() => new URLSearchParams(window.location.search).get("add") === "1");
+  const categorySyncTimer = useRef(null);
 
   // Aggiunge la categoria "Cloud" anche a chi ha già dei dati salvati: i DEFAULT_CATEGORIES
   // valgono solo per le installazioni nuove, quindi qui la inseriamo una volta sola se manca.
@@ -325,6 +376,8 @@ function App() {
         const res = await fetch(url, { method: "GET" });
         if (!res.ok) return;
         const data = await res.json();
+
+        // Transazioni: aggiungi le nuove, rimuovi quelle segnate come eliminate altrove
         const localTx = loadKey("transactions", []);
         const localIds = new Set(localTx.map(t => t.id));
         let cats = loadKey("categories", DEFAULT_CATEGORIES);
@@ -341,11 +394,53 @@ function App() {
         const newOnes = (data.transactions || [])
           .filter(t => !localIds.has(t.id) && !archivedYears.has(String(t.date).slice(0, 4)))
           .map(t => ({ id: t.id, type: t.type, amount: parseFloat(t.amount) || 0, categoryId: ensureCat(t.categoryName, t.type), date: t.date, note: t.note || "", trip: t.trip || "" }));
-        if (newOnes.length > 0) {
-          const merged = [...newOnes, ...localTx];
-          setTransactions(merged); saveKey("transactions", merged);
-          setCategories(cats); saveKey("categories", cats);
+        const deletedTxIds = new Set(data.deletedTransactionIds || []);
+        let mergedTx = [...newOnes, ...localTx];
+        let txChanged = newOnes.length > 0;
+        if (deletedTxIds.size > 0) {
+          const before = mergedTx.length;
+          mergedTx = mergedTx.filter(t => !deletedTxIds.has(t.id));
+          if (mergedTx.length !== before) txChanged = true;
         }
+        if (txChanged) { setTransactions(mergedTx); saveKey("transactions", mergedTx); }
+
+        // Categorie: aggiungi/aggiorna, rimuovi quelle segnate come eliminate altrove
+        let catsChanged = false;
+        if (Array.isArray(data.categories)) {
+          const byId = Object.fromEntries(cats.map(c => [c.id, c]));
+          data.categories.forEach(rc => {
+            const incoming = { id: rc.id, name: rc.name, icon: rc.icon, color: rc.color, type: rc.type, budget: parseFloat(rc.budget) || 0 };
+            const existing = byId[rc.id];
+            if (!existing) { cats.push(incoming); byId[rc.id] = incoming; catsChanged = true; }
+            else if (existing.name !== incoming.name || existing.icon !== incoming.icon || existing.color !== incoming.color || existing.type !== incoming.type || (existing.budget || 0) !== incoming.budget) {
+              Object.assign(existing, incoming); catsChanged = true;
+            }
+          });
+        }
+        const deletedCatIds = new Set(data.deletedCategoryIds || []);
+        if (deletedCatIds.size > 0) {
+          const before = cats.length;
+          cats = cats.filter(c => !deletedCatIds.has(c.id));
+          if (cats.length !== before) catsChanged = true;
+        }
+        if (catsChanged) { setCategories(cats); saveKey("categories", cats); }
+
+        // Risparmi: aggiungi i nuovi, rimuovi quelli segnati come eliminati altrove
+        const localSav = loadKey("savings", []);
+        const localSavIds = new Set(localSav.map(s => s.id));
+        const newSavings = (data.savings || [])
+          .filter(s => !localSavIds.has(s.id))
+          .map(s => ({ id: s.id, type: s.type, amount: parseFloat(s.amount) || 0, date: s.date, note: s.note || "" }));
+        const deletedSavIds = new Set(data.deletedSavingIds || []);
+        let mergedSav = [...newSavings, ...localSav];
+        let savChanged = newSavings.length > 0;
+        if (deletedSavIds.size > 0) {
+          const before = mergedSav.length;
+          mergedSav = mergedSav.filter(s => !deletedSavIds.has(s.id));
+          if (mergedSav.length !== before) savChanged = true;
+        }
+        if (savChanged) { setSavings(mergedSav); saveKey("savings", mergedSav); }
+
         const ts = new Date().toISOString();
         setLastPull(ts); saveKey("last-pull", ts);
       } catch (e) { /* prossimo giro va meglio */ }
@@ -431,12 +526,15 @@ function App() {
     pushToSheet({ action: "update", id, tx: { ...updated, categoryName: catMap[updated.categoryId]?.name || updated.categoryId } });
   }
   function addSaving(entry) {
-    const next = [{ ...entry, id: uid() }, ...savings];
+    const full = { ...entry, id: uid() };
+    const next = [full, ...savings];
     setSavings(next); saveKey("savings", next);
+    pushToSheet({ action: "savingAppend", saving: full });
   }
   function removeSaving(id) {
     const next = savings.filter(s => s.id !== id);
     setSavings(next); saveKey("savings", next);
+    pushToSheet({ action: "savingDelete", id });
   }
   function exportBackup() {
     const data = { app: "Registro", version: APP_VERSION, exportedAt: new Date().toISOString(), categories, transactions, archives, savings };
@@ -473,7 +571,7 @@ function App() {
   }
   async function pullFromSheet() {
     if (!sheetUrl) return;
-    if (!window.confirm("Questo sostituirà le transazioni e gli archivi salvati su questo dispositivo con quelli presenti nel foglio Google. Continuare?")) return;
+    if (!window.confirm("Questo sostituirà transazioni, categorie, risparmi e archivi salvati su questo dispositivo con quelli presenti nel foglio Google. Continuare?")) return;
     setPulling(true);
     try {
       const res = await fetch(sheetUrl, { method: "GET" });
@@ -505,9 +603,21 @@ function App() {
         const totalIncome = parseFloat(a.income) || 0;
         return { year: a.year, categoryTotals, categoryNames, totalIncome, totalExpense, saldo: totalIncome - totalExpense, closedAt: new Date().toISOString() };
       });
+      if (Array.isArray(data.categories)) {
+        const byId = Object.fromEntries(newCats.map(c => [c.id, c]));
+        data.categories.forEach(rc => {
+          const incoming = { id: rc.id, name: rc.name, icon: rc.icon, color: rc.color, type: rc.type, budget: parseFloat(rc.budget) || 0 };
+          if (byId[rc.id]) Object.assign(byId[rc.id], incoming);
+          else { newCats.push(incoming); byId[rc.id] = incoming; }
+        });
+      }
+      const deletedCatIds = new Set(data.deletedCategoryIds || []);
+      if (deletedCatIds.size > 0) newCats = newCats.filter(c => !deletedCatIds.has(c.id));
+      const mappedSavings = (data.savings || []).map(s => ({ id: s.id, type: s.type, amount: parseFloat(s.amount) || 0, date: s.date, note: s.note || "" }));
       setCategories(newCats); saveKey("categories", newCats);
       setTransactions(mapped); saveKey("transactions", mapped);
       setArchives(mappedArchives); saveKey("archives", mappedArchives);
+      setSavings(mappedSavings); saveKey("savings", mappedSavings);
       const ts = new Date().toISOString();
       setLastPull(ts); saveKey("last-pull", ts);
     } catch (e) {
@@ -554,13 +664,23 @@ function App() {
     await pushToSheet({ action: "closeYear", year, categories: catsPayload, totalIncome });
   }
 
+  function pushCategoriesToSheet(cats) {
+    const payload = cats.map(c => ({ id: c.id, name: c.name, icon: c.icon, color: c.color, type: c.type, budget: c.budget || 0 }));
+    pushToSheet({ action: "categoriesSync", categories: payload });
+  }
+  function pushCategoriesDebounced(cats) {
+    clearTimeout(categorySyncTimer.current);
+    categorySyncTimer.current = setTimeout(() => pushCategoriesToSheet(cats), 900);
+  }
   function addCategory(cat) {
     const next = [...categories, { ...cat, id: uid() }];
     setCategories(next); saveKey("categories", next);
+    pushCategoriesToSheet(next);
   }
   function updateCategory(id, patch) {
     const next = categories.map(c => c.id === id ? { ...c, ...patch } : c);
     setCategories(next); saveKey("categories", next);
+    pushCategoriesDebounced(next);
   }
   function removeCategory(id) {
     const cat = categories.find(c => c.id === id);
@@ -579,10 +699,17 @@ function App() {
       setTransactions(nextTx); saveKey("transactions", nextTx);
       const finalCats = nextCats.filter(c => c.id !== id);
       setCategories(finalCats); saveKey("categories", finalCats);
+      pushCategoriesToSheet(finalCats);
+      pushToSheet({ action: "categoryDelete", id });
+      affected.forEach(t => {
+        pushToSheet({ action: "update", id: t.id, tx: { ...t, categoryId: altro.id, categoryName: altro.name } });
+      });
       return;
     }
     const next = categories.filter(c => c.id !== id);
     setCategories(next); saveKey("categories", next);
+    pushCategoriesToSheet(next);
+    pushToSheet({ action: "categoryDelete", id });
   }
 
   const balance = transactions.reduce((s, t) => s + (t.type === "income" ? t.amount : -t.amount), 0)
@@ -695,10 +822,8 @@ function Dashboard({ transactions, categories, catMap, archives }) {
   const thisMonthKey = now.toISOString().slice(0, 7);
   const thisYear = String(now.getFullYear());
 
-  const totalIncome = transactions.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0)
-    + archives.reduce((s, a) => s + (a.totalIncome || 0), 0);
-  const totalExpense = transactions.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0)
-    + archives.reduce((s, a) => s + (a.totalExpense || 0), 0);
+  const totalIncome = transactions.filter(t => t.type === "income" && t.date.slice(0, 4) === thisYear).reduce((s, t) => s + t.amount, 0);
+  const totalExpense = transactions.filter(t => t.type === "expense" && t.date.slice(0, 4) === thisYear).reduce((s, t) => s + t.amount, 0);
 
   const budgetAlerts = useMemo(() => {
     return categories.filter(c => c.type === "expense" && c.budget > 0).map(c => {
@@ -780,8 +905,8 @@ function Dashboard({ transactions, categories, catMap, archives }) {
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))", gap: 12 }}>
-        <StatCard label="Entrate totali" value={eur(totalIncome)} tone="pos" icon="↗" />
-        <StatCard label="Uscite totali" value={eur(totalExpense)} tone="neg" icon="↘" />
+        <StatCard label={`Entrate ${thisYear}`} value={eur(totalIncome)} tone="pos" icon="↗" />
+        <StatCard label={`Uscite ${thisYear}`} value={eur(totalExpense)} tone="neg" icon="↘" />
         <StatCard label="Transazioni" value={transactions.length} icon="◆" />
       </div>
 

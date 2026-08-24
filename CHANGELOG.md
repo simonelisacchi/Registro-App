@@ -1,5 +1,18 @@
 # Changelog — Registro
 
+## v1.19.1
+- **Corretto bug del fuso orario sulla data "oggi".** La data precompilata su nuove transazioni/movimenti, il nome del file di backup e il "mese corrente" usato per gli avvisi budget e il confronto categorie si basavano su UTC invece che sull'ora locale. Nella finestra tra mezzanotte e le 1-2 di notte (a seconda di ora solare/legale), l'app avrebbe mostrato ancora il giorno/mese precedente come "oggi". Ora usa sempre la data del calendario locale del dispositivo. (I timestamp tecnici di sincronizzazione/archiviazione restano invece in UTC, correttamente: sono istanti assoluti, non giorni di calendario.)
+
+## v1.19.0
+- **Nuovo: confronto col mese precedente in "Categorie principali"** (Dashboard, vista "mese"). Ogni categoria mostra un badge con la variazione % rispetto al mese scorso: rosso se sali, verde se scendi, "=" se la variazione è sotto il 3% (variazione ritenuta poco significativa), "nuovo" se il mese scorso non c'era spesa in quella categoria. Nessuna sincronizzazione aggiuntiva richiesta: usa i dati transazioni già presenti in locale.
+
+## v1.18.1
+- **Corrette incoerenze cromatiche nel tema Scuro** (testo poco o per nulla leggibile):
+  - Popup/toast di sincronizzazione: sfondo chiaro con testo bianco, quasi invisibile — ora il testo si adatta correttamente.
+  - Pulsante di conferma eliminazione (Transazioni e Risparmi): scarso contrasto in Scuro — ora leggibile.
+  - Box del codice Apps Script nella guida (scheda Backup): sfondo che si invertiva col tema, testo chiaro su chiaro — ora resta sempre un riquadro scuro leggibile, come un editor di codice.
+  - Tooltip dei grafici (Andamento mensile, Categorie principali): restavano bianchi fissi anche in tema Scuro, stonando con il resto dell'interfaccia — ora seguono il tema.
+
 ## v1.18.0
 - **Ricostruita dopo un problema tecnico dell'ambiente di lavoro** che ha cancellato la copia di lavoro del codice — ricreata da zero riprendendo tutte le funzioni fino alla v1.17.0.
 - **Nuovo: eliminare a mano una riga direttamente su Google Sheets ora si riflette nell'app.** Prima la sincronizzazione automatica sapeva solo aggiungere il nuovo e rimuovere ciò che l'app stessa aveva "marchiato" come eliminato — una cancellazione manuale sul foglio (senza passare dall'app) restava invisibile. Ora, se qualcosa che risulta già inviato sparisce dal foglio, viene considerato eliminato anche in locale (transazioni, categorie, risparmi).

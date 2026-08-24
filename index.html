@@ -131,7 +131,7 @@ const DEFAULT_CATEGORIES = [
   { id: "altro-i", name: "Altro", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const APP_VERSION = "1.18.0";
+const APP_VERSION = "1.19.1";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
@@ -289,7 +289,14 @@ function doGet(e) {
 }`;
 
 const LEVELS_UNUSED = null;
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const thisMonthKeyLocal = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 const eur = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(n || 0);
 const monthKey = (d) => d.slice(0, 7);
@@ -876,7 +883,7 @@ function App() {
             position: "fixed", top: "calc(14px + env(safe-area-inset-top))", left: "50%", transform: "translateX(-50%)",
             zIndex: 45, padding: "8px 16px", borderRadius: 999, fontSize: 12.5, fontWeight: 500,
             background: toastMsg.type === "error" ? TOKENS.negative : toastMsg.type === "warn" ? TOKENS.amber : TOKENS.ink,
-            color: "#fff", boxShadow: "0 4px 14px rgba(33,31,28,0.25)", whiteSpace: "nowrap", maxWidth: "90vw",
+            color: TOKENS.paper, boxShadow: "0 4px 14px rgba(33,31,28,0.25)", whiteSpace: "nowrap", maxWidth: "90vw",
             overflow: "hidden", textOverflow: "ellipsis",
           }}>
             {toastMsg.message}
@@ -971,11 +978,32 @@ function TabBtn({ active, onClick, icon, label, dot }) {
 
 /* ---------- Dashboard ---------- */
 
+function DeltaBadge({ pct }) {
+  if (pct === null || pct === undefined) return null;
+  if (pct === Infinity) {
+    return <span style={{ fontSize: 10.5, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.inkSoft, background: TOKENS.paper2, padding: "2px 6px", borderRadius: 999 }}>nuovo</span>;
+  }
+  if (Math.abs(pct) < 3) {
+    return <span style={{ fontSize: 10.5, fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.inkSoft, background: TOKENS.paper2, padding: "2px 6px", borderRadius: 999 }}>=</span>;
+  }
+  const up = pct > 0;
+  return (
+    <span style={{
+      fontSize: 10.5, fontFamily: "'IBM Plex Mono', monospace",
+      color: up ? TOKENS.negative : TOKENS.accent,
+      background: up ? TOKENS.negativeSoft : TOKENS.accentSoft,
+      padding: "2px 6px", borderRadius: 999,
+    }}>{up ? "+" : ""}{Math.round(pct)}%</span>
+  );
+}
+
 function Dashboard({ transactions, categories, catMap, archives }) {
   const [catPeriod, setCatPeriod] = useState("mese");
   const now = new Date();
-  const thisMonthKey = now.toISOString().slice(0, 7);
+  const thisMonthKey = thisMonthKeyLocal();
   const thisYear = String(now.getFullYear());
+  const [tmY, tmM] = thisMonthKey.split("-").map(Number);
+  const prevMonthKey = tmM === 1 ? `${tmY - 1}-12` : `${tmY}-${String(tmM - 1).padStart(2, "0")}`;
 
   const totalIncome = transactions.filter(t => t.type === "income" && t.date.slice(0, 4) === thisYear).reduce((s, t) => s + t.amount, 0);
   const totalExpense = transactions.filter(t => t.type === "expense" && t.date.slice(0, 4) === thisYear).reduce((s, t) => s + t.amount, 0);
@@ -1024,10 +1052,27 @@ function Dashboard({ transactions, categories, catMap, archives }) {
     });
     const map = {};
     filtered.forEach(t => { map[t.categoryId] = (map[t.categoryId] || 0) + t.amount; });
+
+    let prevMap = {};
+    if (catPeriod === "mese") {
+      transactions.forEach(t => {
+        if (t.type === "expense" && monthKey(t.date) === prevMonthKey) {
+          prevMap[t.categoryId] = (prevMap[t.categoryId] || 0) + t.amount;
+        }
+      });
+    }
+
     return Object.entries(map)
-      .map(([id, value]) => ({ id, value: +value.toFixed(2), name: catMap[id]?.name || "Altro", color: catMap[id]?.color || "#999" }))
+      .map(([id, value]) => {
+        const prevValue = prevMap[id] || 0;
+        let deltaPct = null;
+        if (catPeriod === "mese") {
+          deltaPct = prevValue > 0 ? ((value - prevValue) / prevValue) * 100 : (value > 0 ? Infinity : null);
+        }
+        return { id, value: +value.toFixed(2), name: catMap[id]?.name || "Altro", color: catMap[id]?.color || "#999", deltaPct };
+      })
       .sort((a, b) => b.value - a.value).slice(0, 8);
-  }, [transactions, catPeriod, thisMonthKey, thisYear, catMap]);
+  }, [transactions, catPeriod, thisMonthKey, prevMonthKey, thisYear, catMap]);
 
   if (transactions.length === 0) {
     return (
@@ -1081,7 +1126,7 @@ function Dashboard({ transactions, categories, catMap, archives }) {
             <CartesianGrid stroke={TOKENS.line} vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={{ stroke: TOKENS.line }} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={false} tickLine={false} width={46} />
-            <Tooltip formatter={(v) => eur(v)} labelFormatter={(d) => `giorno ${d}`} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8 }} />
+            <Tooltip formatter={(v) => eur(v)} labelFormatter={(d) => `giorno ${d}`} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8, background: TOKENS.cardBg, color: TOKENS.ink }} itemStyle={{ color: TOKENS.ink }} labelStyle={{ color: TOKENS.inkSoft }} />
             <Area type="monotone" dataKey="entrate" stroke={TOKENS.accent} fill="url(#gEnt)" strokeWidth={2} />
             <Area type="monotone" dataKey="uscite" stroke={TOKENS.negative} fill="url(#gUsc)" strokeWidth={2} />
           </AreaChart>
@@ -1113,7 +1158,7 @@ function Dashboard({ transactions, categories, catMap, archives }) {
                 <Pie data={catData} dataKey="value" nameKey="name" innerRadius={48} outerRadius={78} paddingAngle={2}>
                   {catData.map((d, i) => <Cell key={i} fill={d.color} stroke="var(--card-bg)" strokeWidth={1} />)}
                 </Pie>
-                <Tooltip formatter={(v) => eur(v)} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8 }} />
+                <Tooltip formatter={(v) => eur(v)} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8, background: TOKENS.cardBg, color: TOKENS.ink }} itemStyle={{ color: TOKENS.ink }} labelStyle={{ color: TOKENS.inkSoft }} />
               </PieChart>
             </ResponsiveContainer>
             <div style={{ flex: 1, minWidth: 180, display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1123,7 +1168,10 @@ function Dashboard({ transactions, categories, catMap, archives }) {
                     <span style={{ width: 9, height: 9, borderRadius: 3, background: d.color, display: "inline-block" }} />
                     {d.name}
                   </span>
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{eur(d.value)}</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <DeltaBadge pct={d.deltaPct} />
+                    <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{eur(d.value)}</span>
+                  </span>
                 </div>
               ))}
             </div>
@@ -1251,7 +1299,7 @@ function Transazioni({ transactions, categories, catMap, onAdd, onRemove, onUpda
                 ✎
               </button>
               <button onClick={() => confirmId === t.id ? (onRemove(t.id), setConfirmId(null)) : setConfirmId(t.id)}
-                style={{ border: "none", background: confirmId === t.id ? TOKENS.negative : "transparent", color: confirmId === t.id ? "#fff" : TOKENS.inkSoft, borderRadius: 6, padding: "6px 8px", cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                style={{ border: "none", background: confirmId === t.id ? TOKENS.negative : "transparent", color: confirmId === t.id ? TOKENS.paper : TOKENS.inkSoft, borderRadius: 6, padding: "6px 8px", cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                 <span>🗑</span>{confirmId === t.id ? "conferma" : ""}
               </button>
             </div>
@@ -1580,7 +1628,7 @@ function Risparmi({ savings, onAdd, onRemove }) {
               <CartesianGrid stroke={TOKENS.line} vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={{ stroke: TOKENS.line }} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={false} tickLine={false} width={46} />
-              <Tooltip formatter={(v) => eur(v)} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8 }} />
+              <Tooltip formatter={(v) => eur(v)} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8, background: TOKENS.cardBg, color: TOKENS.ink }} itemStyle={{ color: TOKENS.ink }} labelStyle={{ color: TOKENS.inkSoft }} />
               <Area type="monotone" dataKey="value" stroke={TOKENS.accent} fill="url(#gSav)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
@@ -1611,7 +1659,7 @@ function Risparmi({ savings, onAdd, onRemove }) {
               {m.type === "prelievo" ? "−" : "+"}{eur(m.amount)}
             </div>
             <button onClick={() => confirmId === m.id ? (onRemove(m.id), setConfirmId(null)) : setConfirmId(m.id)}
-              style={{ border: "none", background: confirmId === m.id ? TOKENS.negative : "transparent", color: confirmId === m.id ? "#fff" : TOKENS.inkSoft, borderRadius: 6, padding: "6px 8px", cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+              style={{ border: "none", background: confirmId === m.id ? TOKENS.negative : "transparent", color: confirmId === m.id ? TOKENS.paper : TOKENS.inkSoft, borderRadius: 6, padding: "6px 8px", cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
               <span>🗑</span>{confirmId === m.id ? "conferma" : ""}
             </button>
           </div>
@@ -1761,7 +1809,7 @@ function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onS
               </div>
             ))}
             <div style={{ position: "relative", marginTop: 6 }}>
-              <pre style={{ background: TOKENS.ink, color: "#E7E3D8", fontSize: 11.5, padding: 14, borderRadius: 10, overflowX: "auto", fontFamily: "'IBM Plex Mono', monospace", lineHeight: 1.6, margin: 0 }}>{APPS_SCRIPT_CODE}</pre>
+              <pre style={{ background: "#211F1C", color: "#E7E3D8", fontSize: 11.5, padding: 14, borderRadius: 10, overflowX: "auto", fontFamily: "'IBM Plex Mono', monospace", lineHeight: 1.6, margin: 0 }}>{APPS_SCRIPT_CODE}</pre>
               <button onClick={copyCode} style={{ position: "absolute", top: 8, right: 8, border: "none", background: "rgba(255,255,255,0.12)", color: "#fff", borderRadius: 6, padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 11 }}>
                 <span>{copied ? "✓✓" : "⧉"}</span> {copied ? "copiato" : "copia"}
               </button>

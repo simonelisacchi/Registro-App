@@ -1,5 +1,8 @@
 # Changelog — Registro
 
+## v1.24.2
+- **Tastierino numerico su tutti i campi importo** (nuova transazione, nuovo movimento risparmi, budget categoria, rettifica saldo, correzione entrate anno archiviato): aggiunto `inputMode="decimal"`, l'attributo corretto per chiedere al telefono il tastierino numerico invece della tastiera intera — più affidabile del solo `type="number"`, che su alcuni Android può comunque mostrare la tastiera completa.
+
 ## v1.24.1
 - **Disattivato lo zoom con le dita (pinch e doppio tap)**: il meta viewport da solo (`maximum-scale=1, user-scalable=no`) non basta su iOS Safari, che lo ignora volutamente per motivi di accessibilità. Aggiunto anche `touch-action: manipulation` via CSS e un piccolo script che intercetta i gesti di pinch e il doppio tap, per bloccare lo zoom in modo affidabile su tutti i dispositivi.
 

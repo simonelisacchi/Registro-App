@@ -1,5 +1,20 @@
 # Changelog — Registro
 
+## v1.24.0
+- **Barra in basso semplificata**: ora ha solo Dashboard, Transazioni, Categorie, Risparmi (prima 6 tab, troppo strette). Analisi e Backup si aprono da un menu dedicato.
+- **Nuovo tasto menu (☰)** in alto a destra nell'header, più grande e prominente del vecchio ingranaggio: apre un menu con Analisi, Backup e Impostazioni (tema, nome, data di nascita — quello che prima era dietro l'icona ⚙). Il pallino d'avviso per problemi di sincronizzazione, prima sulla tab Backup, ora compare sia sul tasto menu che sulla voce Backup al suo interno, così resta visibile anche senza aprire il menu.
+
+## v1.23.0
+- **Analisi più approfondita**, tre aggiunte alla scheda Analisi:
+  - **Andamento categorie**: ora puoi selezionare più categorie insieme (chip cliccabili) e confrontarle sullo stesso grafico, invece di vederne una alla volta.
+  - **Spese fuori dal solito**: individua automaticamente le transazioni nettamente sopra il valore tipico della loro categoria. Usa mediana e scarto assoluto mediano invece di media/deviazione standard — un singolo valore molto estremo altrimenti "gonfia" la media al punto da rendersi quasi invisibile alla soglia (verificato con un caso di test dedicato prima di rilasciarlo).
+  - **Ricorrenze rilevate**: individua pattern tipo abbonamento — stessa categoria e importo simile (±0,50€) presenti in almeno 3 mesi diversi, per almeno metà dei mesi coperti — con stima della spesa annua.
+
+## v1.22.0
+- **⚠️ Richiede un aggiornamento manuale dello script Google**: questa versione cambia lo script Apps Script (aggiunge il profilo). Vai su Backup → guida in fondo, copia il nuovo codice e rifai il deployment (Esegui il deployment → Gestisci i deployment → matita → Versione: Nuova versione → Deploy). Senza questo passaggio nome e data di nascita non si sincronizzano, il resto dell'app funziona comunque.
+- **Corretto "Andamento categoria" in Analisi**: mostrava un intervallo di 12 mesi che poteva sconfinare nell'anno precedente — ma un anno chiuso/archiviato perde le transazioni singole (restano solo i totali per categoria), quindi il grafico poteva risultare vuoto o fuorviante per quei mesi. Ora mostra sempre e solo l'anno corrente, gennaio-dicembre.
+- **Nome e data di nascita personalizzabili**, in Impostazioni (icona ⚙ in alto): il nome sostituisce "SIMONE" (prima fisso nel codice) nell'intestazione, rendendo l'app generica per chiunque la usi. Entrambi i campi si sincronizzano tra i dispositivi tramite una nuova tab "Profilo" nel foglio Google (se collegato) — stesso comportamento di categorie e risparmi, inclusa la coda offline se manca la rete. La data di nascita non compare in Dashboard: resta in Impostazioni, pensata per eventuali funzionalità future (es. proiezioni legate all'età, quando si arriverà a parlare di investimenti).
+
 ## v1.21.0
 - **Nuova scheda "Analisi"**, dedicata all'analisi approfondita delle spese (separata dalla Dashboard, che resta per la lettura veloce quotidiana):
   - **Andamento categoria**: grafico degli ultimi 12 mesi per la categoria di spesa scelta.

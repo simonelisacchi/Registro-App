@@ -106,7 +106,7 @@
 <script type="text/babel" data-presets="react">
 
 const { useState, useEffect, useMemo, useRef } = React;
-const { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, BarChart, Bar } = Recharts;
+const { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, BarChart, Bar, LineChart, Line } = Recharts;
 
 /* ---------- dati di partenza ---------- */
 
@@ -131,7 +131,7 @@ const DEFAULT_CATEGORIES = [
   { id: "altro-i", name: "Paghetta", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const APP_VERSION = "1.21.0";
+const APP_VERSION = "1.24.0";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
@@ -231,6 +231,13 @@ function doPost(e) {
   } else if (body.action === 'savingDelete') {
     var ssheet2 = ss.getSheetByName('Risparmi');
     if (ssheet2) markDeletedById(ssheet2, body.id, 6);
+
+  } else if (body.action === 'profileSync') {
+    var psheet = ss.getSheetByName('Profilo') || ss.insertSheet('Profilo');
+    if (psheet.getLastRow() === 0) psheet.appendRow(['Nome', 'DataNascita']);
+    var prow = [body.name || '', body.birthdate || ''];
+    if (psheet.getLastRow() < 2) psheet.appendRow(prow);
+    else psheet.getRange(2, 1, 1, 2).setValues([prow]);
   }
   return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
 }
@@ -238,7 +245,7 @@ function doPost(e) {
 function doGet(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var tz = Session.getScriptTimeZone();
-  var out = { transactions: [], archives: [], categories: [], savings: [], deletedTransactionIds: [], deletedCategoryIds: [], deletedSavingIds: [] };
+  var out = { transactions: [], archives: [], categories: [], savings: [], deletedTransactionIds: [], deletedCategoryIds: [], deletedSavingIds: [], profile: null };
 
   ss.getSheets().forEach(function(sheet) {
     if (!/^\\d{4}$/.test(sheet.getName())) return;
@@ -283,6 +290,14 @@ function doGet(e) {
       var sdateStr = (sd instanceof Date) ? Utilities.formatDate(sd, tz, 'yyyy-MM-dd') : String(sd);
       out.savings.push({ id: r[0], type: r[1], amount: r[2], date: sdateStr, note: r[4] || '' });
     });
+  }
+
+  var psheet3 = ss.getSheetByName('Profilo');
+  if (psheet3 && psheet3.getLastRow() > 1) {
+    var prow = psheet3.getDataRange().getValues()[1];
+    var pbirth = prow[1];
+    var pbirthStr = (pbirth instanceof Date) ? Utilities.formatDate(pbirth, tz, 'yyyy-MM-dd') : String(pbirth || '');
+    out.profile = { name: prow[0] || '', birthdate: pbirthStr };
   }
 
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
@@ -332,6 +347,8 @@ function App() {
   const [transactions, setTransactions] = useState(() => loadKey("transactions", []));
   const [archives, setArchives] = useState(() => loadKey("archives", []));
   const [savings, setSavings] = useState(() => loadKey("savings", []));
+  const [profileName, setProfileNameState] = useState(() => loadKey("profile-name", ""));
+  const [profileBirthdate, setProfileBirthdateState] = useState(() => loadKey("profile-birthdate", ""));
   const [sheetUrl, setSheetUrlState] = useState(() => loadKey("sheet-url", ""));
   const [lastSync, setLastSync] = useState(() => loadKey("last-sync", ""));
   const [lastPull, setLastPull] = useState(() => loadKey("last-pull", ""));
@@ -344,8 +361,10 @@ function App() {
   const [forcingSync, setForcingSync] = useState(false);
   const [theme, setTheme] = useState(() => loadKey("theme", "system"));
   const [showSettings, setShowSettings] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [quickAdd, setQuickAdd] = useState(() => new URLSearchParams(window.location.search).get("add") === "1");
   const categorySyncTimer = useRef(null);
+  const profileSyncTimer = useRef(null);
   const toastTimer = useRef(null);
 
   function showToast(message, type = "info") {
@@ -459,6 +478,18 @@ function App() {
   function pushCategoriesDebounced(cats) {
     clearTimeout(categorySyncTimer.current);
     categorySyncTimer.current = setTimeout(() => pushCategoriesToSheet(cats), 900);
+  }
+  function pushProfileToSheet(name, birthdate) {
+    pushToSheet({ action: "profileSync", name, birthdate });
+  }
+  function pushProfileDebounced(name, birthdate) {
+    clearTimeout(profileSyncTimer.current);
+    profileSyncTimer.current = setTimeout(() => pushProfileToSheet(name, birthdate), 900);
+  }
+  function updateProfile(name, birthdate) {
+    setProfileNameState(name); saveKey("profile-name", name);
+    setProfileBirthdateState(birthdate); saveKey("profile-birthdate", birthdate);
+    pushProfileDebounced(name, birthdate);
   }
   function addCategory(cat) {
     const next = [...categories, { ...cat, id: uid() }];
@@ -632,6 +663,10 @@ function App() {
       setTransactions(mapped); saveKey("transactions", mapped);
       setArchives(mappedArchives); saveKey("archives", mappedArchives);
       setSavings(mappedSavings); saveKey("savings", mappedSavings);
+      if (data.profile) {
+        setProfileNameState(data.profile.name || ""); saveKey("profile-name", data.profile.name || "");
+        setProfileBirthdateState(data.profile.birthdate || ""); saveKey("profile-birthdate", data.profile.birthdate || "");
+      }
       const ts = new Date().toISOString();
       setLastPull(ts); saveKey("last-pull", ts);
     } catch (e) {
@@ -688,6 +723,7 @@ function App() {
       const pendingTxIds = new Set(pending.map(i => i.payload?.tx?.id || i.payload?.id).filter(Boolean));
       const pendingCatIds = new Set(pending.map(i => (i.payload?.action === "categoriesSync" ? (i.payload.categories || []).map(c => c.id) : [])).flat());
       const pendingSavIds = new Set(pending.map(i => (i.payload?.action === "savingAppend" ? i.payload.saving?.id : null)).filter(Boolean));
+      const pendingProfileEdit = pending.some(i => i.payload?.action === "profileSync");
 
       // Transazioni
       const localTx = loadKey("transactions", []);
@@ -766,6 +802,18 @@ function App() {
       });
       if (mergedSav.length !== beforeS) savChanged = true;
       if (savChanged) { setSavings(mergedSav); saveKey("savings", mergedSav); }
+
+      // Profilo (nome e data di nascita, sincronizzati)
+      if (data.profile && !pendingProfileEdit) {
+        const localName = loadKey("profile-name", "");
+        const localBirth = loadKey("profile-birthdate", "");
+        const remoteName = data.profile.name || "";
+        const remoteBirth = data.profile.birthdate || "";
+        if (remoteName !== localName || remoteBirth !== localBirth) {
+          setProfileNameState(remoteName); saveKey("profile-name", remoteName);
+          setProfileBirthdateState(remoteBirth); saveKey("profile-birthdate", remoteBirth);
+        }
+      }
 
       const ts = new Date().toISOString();
       setLastPull(ts); saveKey("last-pull", ts);
@@ -851,20 +899,61 @@ function App() {
       <div style={S.shell}>
         <header style={S.header}>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={S.eyebrow}>MONEY TRACKER · SIMONE</span>
-              <button onClick={()=>setShowSettings(true)} aria-label="Impostazioni" style={{ border: "none", background: "none", color: TOKENS.inkSoft, cursor: "pointer", fontSize: 13, padding: 2, lineHeight: 1, display: "flex", alignItems: "center" }}>⚙</button>
-            </div>
+            <span style={S.eyebrow}>MONEY TRACKER{profileName ? ` · ${profileName.toUpperCase()}` : ""}</span>
             <h1 style={S.h1}>Registro</h1>
           </div>
-          <div style={S.headerBalance}>
-            <span style={S.headerBalanceLabel}>saldo</span>
-            <span style={{ ...S.headerBalanceNum, color: balance >= 0 ? TOKENS.accent : TOKENS.negative }}>{eur(balance)}</span>
-            {sheetUrl && (
-              <button onClick={forceSyncNow} disabled={forcingSync} style={{ border: "none", background: "none", color: TOKENS.inkSoft, fontSize: 11.5, marginTop: 4, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
-                <span style={{ display: "inline-block", animation: forcingSync ? "spin 0.9s linear infinite" : "none" }}>⟳</span> {forcingSync ? "sincronizzo…" : "sincronizza ora"}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+            <div style={S.headerBalance}>
+              <span style={S.headerBalanceLabel}>saldo</span>
+              <span style={{ ...S.headerBalanceNum, color: balance >= 0 ? TOKENS.accent : TOKENS.negative }}>{eur(balance)}</span>
+              {sheetUrl && (
+                <button onClick={forceSyncNow} disabled={forcingSync} style={{ border: "none", background: "none", color: TOKENS.inkSoft, fontSize: 11.5, marginTop: 4, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
+                  <span style={{ display: "inline-block", animation: forcingSync ? "spin 0.9s linear infinite" : "none" }}>⟳</span> {forcingSync ? "sincronizzo…" : "sincronizza ora"}
+                </button>
+              )}
+            </div>
+            <div style={{ position: "relative" }}>
+              <button onClick={()=>setShowMenu(v=>!v)} aria-label="Menu" style={{
+                border: "none", background: TOKENS.paper2, color: TOKENS.ink, cursor: "pointer",
+                fontSize: 21, width: 42, height: 42, borderRadius: 12, lineHeight: 1,
+                display: "flex", alignItems: "center", justifyContent: "center", position: "relative",
+              }}>
+                ☰
+                {(!sheetUrl || pendingCount > 0) && <span style={{ position: "absolute", top: 6, right: 6, width: 7, height: 7, borderRadius: "50%", background: TOKENS.amber }} />}
               </button>
-            )}
+              {showMenu && (
+                <>
+                  <div onClick={()=>setShowMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 39 }} />
+                  <div style={{
+                    position: "absolute", top: 48, right: 0, zIndex: 40, background: TOKENS.paper,
+                    borderRadius: 12, boxShadow: `0 8px 26px ${TOKENS.shadow2}`, minWidth: 190, overflow: "hidden",
+                    border: `1px solid ${TOKENS.line}`,
+                  }}>
+                    {[
+                      ["analisi", "◫", "Analisi", false],
+                      ["backup", "☁", "Backup", !sheetUrl || pendingCount > 0],
+                    ].map(([key, icon, label, dot]) => (
+                      <button key={key} onClick={()=>{ setTab(key); setShowMenu(false); }} style={{
+                        display: "flex", alignItems: "center", gap: 10, width: "100%", border: "none",
+                        background: tab === key ? TOKENS.paper2 : "transparent", color: TOKENS.ink,
+                        padding: "12px 14px", fontSize: 14, cursor: "pointer", textAlign: "left",
+                      }}>
+                        <span style={{ fontSize: 16, width: 18, textAlign: "center" }}>{icon}</span>
+                        <span style={{ flex: 1 }}>{label}</span>
+                        {dot && <span style={{ width: 7, height: 7, borderRadius: "50%", background: TOKENS.amber }} />}
+                      </button>
+                    ))}
+                    <button onClick={()=>{ setShowSettings(true); setShowMenu(false); }} style={{
+                      display: "flex", alignItems: "center", gap: 10, width: "100%", border: "none", borderTop: `1px solid ${TOKENS.line}`,
+                      background: "transparent", color: TOKENS.ink, padding: "12px 14px", fontSize: 14, cursor: "pointer", textAlign: "left",
+                    }}>
+                      <span style={{ fontSize: 16, width: 18, textAlign: "center" }}>⚙</span>
+                      <span style={{ flex: 1 }}>Impostazioni</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
@@ -888,6 +977,18 @@ function App() {
                   </button>
                 ))}
               </div>
+
+              <p style={{ fontSize: 12.5, color: TOKENS.inkSoft, margin: "18px 0 10px" }}>Profilo{sheetUrl ? " · sincronizzato tra i dispositivi" : ""}</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: TOKENS.inkSoft, display: "block", marginBottom: 4 }}>Nome</label>
+                  <input type="text" value={profileName} onChange={(e)=>updateProfile(e.target.value, profileBirthdate)} placeholder="Il tuo nome" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: TOKENS.inkSoft, display: "block", marginBottom: 4 }}>Data di nascita <span style={{ opacity: 0.7 }}>(facoltativa)</span></label>
+                  <input type="date" value={profileBirthdate} onChange={(e)=>updateProfile(profileName, e.target.value)} style={inputStyle} />
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -909,9 +1010,7 @@ function App() {
           <TabBtn active={tab==="dashboard"} onClick={()=>setTab("dashboard")} icon="▦" label="Dashboard" />
           <TabBtn active={tab==="transazioni"} onClick={()=>setTab("transazioni")} icon="☰" label="Transazioni" />
           <TabBtn active={tab==="categorie"} onClick={()=>setTab("categorie")} icon="🏷" label="Categorie" />
-          <TabBtn active={tab==="analisi"} onClick={()=>setTab("analisi")} icon="◫" label="Analisi" />
           <TabBtn active={tab==="risparmi"} onClick={()=>setTab("risparmi")} icon="🏦" label="Risparmi" />
-          <TabBtn active={tab==="backup"} onClick={()=>setTab("backup")} icon="☁" label="Backup" dot={!sheetUrl || pendingCount > 0} />
         </nav>
 
         <div className="content-col">
@@ -1239,32 +1338,34 @@ function LegendDot({ color, label }) {
 
 function Analisi({ transactions, categories, catMap }) {
   const expenseCats = useMemo(() => categories.filter(c => c.type === "expense"), [categories]);
-  const [selectedCatId, setSelectedCatId] = useState(() => expenseCats[0]?.id || "");
+  const [selectedCatIds, setSelectedCatIds] = useState(() => expenseCats[0] ? [expenseCats[0].id] : []);
 
   useEffect(() => {
-    if (!selectedCatId && expenseCats.length > 0) setSelectedCatId(expenseCats[0].id);
+    if (selectedCatIds.length === 0 && expenseCats.length > 0) setSelectedCatIds([expenseCats[0].id]);
   }, [expenseCats]); // eslint-disable-line
 
+  function toggleCat(id) {
+    setSelectedCatIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
+
   const monthsRange = useMemo(() => {
-    const now = new Date();
-    const y = now.getFullYear(), m = now.getMonth() + 1;
+    const y = new Date().getFullYear();
     const keys = [];
-    for (let i = 11; i >= 0; i--) {
-      let mm = m - i, yy = y;
-      while (mm <= 0) { mm += 12; yy -= 1; }
-      keys.push(`${yy}-${String(mm).padStart(2, "0")}`);
-    }
+    for (let m = 1; m <= 12; m++) keys.push(`${y}-${String(m).padStart(2, "0")}`);
     return keys;
   }, []);
 
   const trendData = useMemo(() => {
     return monthsRange.map(k => {
-      const value = transactions
-        .filter(t => t.type === "expense" && t.categoryId === selectedCatId && monthKey(t.date) === k)
-        .reduce((s, t) => s + t.amount, 0);
-      return { key: k, label: monthLabel(k), value: +value.toFixed(2) };
+      const row = { key: k, label: monthLabel(k) };
+      selectedCatIds.forEach(id => {
+        row[id] = +transactions
+          .filter(t => t.type === "expense" && t.categoryId === id && monthKey(t.date) === k)
+          .reduce((s, t) => s + t.amount, 0).toFixed(2);
+      });
+      return row;
     });
-  }, [transactions, selectedCatId, monthsRange]);
+  }, [transactions, selectedCatIds, monthsRange]);
 
   const now = new Date();
   const year = now.getFullYear(), month0 = now.getMonth(), dayToday = now.getDate();
@@ -1309,34 +1410,107 @@ function Analisi({ transactions, categories, catMap }) {
     }));
   }, [expenseTx]);
 
-  const selectedCat = catMap[selectedCatId];
+  // Spese anomale: per ogni categoria con almeno 4 transazioni, segnala quelle nettamente sopra
+  // il valore tipico (la mediana) della categoria. Uso mediana + scarto assoluto mediano (MAD)
+  // invece di media + deviazione standard: un singolo valore molto estremo "gonfia" media e
+  // deviazione standard al punto da rendersi quasi invisibile alla soglia — la mediana no.
+  const anomalies = useMemo(() => {
+    const median = (arr) => {
+      const s = [...arr].sort((a, b) => a - b);
+      const mid = Math.floor(s.length / 2);
+      return s.length % 2 !== 0 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+    };
+    const byCat = {};
+    expenseTx.forEach(t => { (byCat[t.categoryId] = byCat[t.categoryId] || []).push(t); });
+    const flagged = [];
+    Object.entries(byCat).forEach(([catId, txs]) => {
+      if (txs.length < 4) return;
+      const amounts = txs.map(t => t.amount);
+      const med = median(amounts);
+      const mad = median(amounts.map(a => Math.abs(a - med)));
+      txs.forEach(t => {
+        if (t.amount <= med) return;
+        const isAnomaly = mad === 0
+          ? (t.amount > med * 1.5 && (t.amount - med) > 1)
+          : (0.6745 * (t.amount - med) / mad) > 3.5;
+        if (isAnomaly) flagged.push({ ...t, mean: med, multiple: med > 0 ? t.amount / med : null });
+      });
+    });
+    return flagged.sort((a, b) => (b.multiple || 0) - (a.multiple || 0)).slice(0, 8);
+  }, [expenseTx]);
+
+  // Ricorrenze: transazioni con stessa categoria e importo simile (± 0,50€) che tornano in
+  // mesi diversi. Richiede almeno 3 mesi distinti e presenza in almeno metà dei mesi coperti,
+  // per distinguere un vero abbonamento da coincidenze sporadiche.
+  const recurring = useMemo(() => {
+    const groups = {};
+    expenseTx.forEach(t => {
+      const bucket = Math.round(t.amount * 2) / 2;
+      const key = t.categoryId + "|" + bucket;
+      if (!groups[key]) groups[key] = { catId: t.categoryId, bucket, byMonth: {} };
+      const mk = monthKey(t.date);
+      if (!groups[key].byMonth[mk] || t.date > groups[key].byMonth[mk].date) groups[key].byMonth[mk] = t;
+    });
+    const results = [];
+    Object.values(groups).forEach(g => {
+      const months = Object.keys(g.byMonth).sort();
+      if (months.length < 3) return;
+      const [fy, fm] = months[0].split("-").map(Number);
+      const [ly, lm] = months[months.length - 1].split("-").map(Number);
+      const span = (ly - fy) * 12 + (lm - fm) + 1;
+      const confidence = months.length / span;
+      if (confidence < 0.5) return;
+      results.push({
+        catId: g.catId, amount: g.bucket, count: months.length,
+        firstMonth: months[0], lastMonth: months[months.length - 1],
+        annualEstimate: g.bucket * 12,
+      });
+    });
+    return results.sort((a, b) => b.amount - a.amount);
+  }, [expenseTx]);
 
   return (
     <>
       <div style={S.card}>
-        <h3 style={S.sectionTitle}>Andamento categoria</h3>
+        <h3 style={S.sectionTitle}>Andamento categorie · {new Date().getFullYear()}</h3>
         {expenseCats.length === 0 ? (
           <p style={{ color: TOKENS.inkSoft, fontSize: 13.5 }}>Crea prima qualche categoria di spesa.</p>
         ) : (
           <>
-            <select value={selectedCatId} onChange={e => setSelectedCatId(e.target.value)} style={{ ...inputStyle, maxWidth: 220, marginBottom: 14 }}>
-              {expenseCats.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-            </select>
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={trendData} margin={{ left: -18, top: 6, right: 6 }}>
-                <defs>
-                  <linearGradient id="gTrendCat" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={selectedCat?.color || TOKENS.negative} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={selectedCat?.color || TOKENS.negative} stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke={TOKENS.line} vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={{ stroke: TOKENS.line }} tickLine={false} interval={1} />
-                <YAxis tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={false} tickLine={false} width={46} />
-                <Tooltip formatter={(v) => eur(v)} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8, background: TOKENS.cardBg, color: TOKENS.ink }} itemStyle={{ color: TOKENS.ink }} labelStyle={{ color: TOKENS.inkSoft }} />
-                <Area type="monotone" dataKey="value" stroke={selectedCat?.color || TOKENS.negative} fill="url(#gTrendCat)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+              {expenseCats.map(c => {
+                const active = selectedCatIds.includes(c.id);
+                return (
+                  <button key={c.id} onClick={() => toggleCat(c.id)} style={{
+                    display: "flex", alignItems: "center", gap: 5, border: `1px solid ${active ? c.color : TOKENS.line}`,
+                    background: active ? c.color + "22" : "transparent", color: active ? c.color : TOKENS.inkSoft,
+                    borderRadius: 999, padding: "5px 10px", fontSize: 12.5, cursor: "pointer",
+                  }}>
+                    <span>{c.icon}</span>{c.name}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedCatIds.length === 0 ? (
+              <p style={{ color: TOKENS.inkSoft, fontSize: 13.5 }}>Scegli almeno una categoria da confrontare.</p>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={trendData} margin={{ left: -18, top: 6, right: 6 }}>
+                    <CartesianGrid stroke={TOKENS.line} vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={{ stroke: TOKENS.line }} tickLine={false} interval={1} />
+                    <YAxis tick={{ fontSize: 11, fill: TOKENS.inkSoft, fontFamily: "IBM Plex Mono" }} axisLine={false} tickLine={false} width={46} />
+                    <Tooltip formatter={(v, name) => [eur(v), catMap[name]?.name || name]} contentStyle={{ fontFamily: "Inter", fontSize: 12, border: `1px solid ${TOKENS.line}`, borderRadius: 8, background: TOKENS.cardBg, color: TOKENS.ink }} itemStyle={{ color: TOKENS.ink }} labelStyle={{ color: TOKENS.inkSoft }} />
+                    {selectedCatIds.map(id => (
+                      <Line key={id} type="monotone" dataKey={id} stroke={catMap[id]?.color || TOKENS.negative} strokeWidth={2} dot={false} />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 8 }}>
+                  {selectedCatIds.map(id => <LegendDot key={id} color={catMap[id]?.color || TOKENS.negative} label={catMap[id]?.name || id} />)}
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
@@ -1382,6 +1556,64 @@ function Analisi({ transactions, categories, catMap }) {
             {expenseTx.length < 14 && (
               <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 10 }}>Con poche transazioni storiche il pattern è ancora indicativo — diventa più affidabile con più dati.</p>
             )}
+          </>
+        )}
+      </div>
+
+      <div style={S.card}>
+        <h3 style={S.sectionTitle}>Spese fuori dal solito</h3>
+        {anomalies.length === 0 ? (
+          <p style={{ color: TOKENS.inkSoft, fontSize: 13.5 }}>Nessuna spesa fuori dal solito individuata finora — bene così.</p>
+        ) : (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {anomalies.map((t, i) => {
+                const c = catMap[t.categoryId];
+                return (
+                  <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: i === anomalies.length - 1 ? "none" : `1px solid ${TOKENS.line}` }}>
+                    <span style={{ fontSize: 18 }}>{c?.icon || "🏷️"}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5 }}>{c?.name || "—"}</div>
+                      <div style={{ fontSize: 11.5, color: TOKENS.inkSoft }}>{new Date(t.date).toLocaleDateString("it-IT", { day: "numeric", month: "short" })} · valore tipico categoria {eur(t.mean)}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 14, color: TOKENS.negative }}>{eur(t.amount)}</div>
+                      <div style={{ fontSize: 11, color: TOKENS.negative }}>{t.multiple != null ? t.multiple.toFixed(1) + "×" : ""}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 10 }}>Segnalate le spese nettamente sopra il valore tipico della propria categoria, con un calcolo che non si lascia ingannare da un singolo valore estremo (richiede almeno 4 transazioni in quella categoria).</p>
+          </>
+        )}
+      </div>
+
+      <div style={S.card}>
+        <h3 style={S.sectionTitle}>Ricorrenze rilevate</h3>
+        {recurring.length === 0 ? (
+          <p style={{ color: TOKENS.inkSoft, fontSize: 13.5 }}>Nessuna spesa ricorrente individuata finora — servono almeno 3 mesi di storico per una stessa categoria/importo.</p>
+        ) : (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {recurring.map((r, i) => {
+                const c = catMap[r.catId];
+                return (
+                  <div key={r.catId + r.amount} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: i === recurring.length - 1 ? "none" : `1px solid ${TOKENS.line}` }}>
+                    <span style={{ fontSize: 18 }}>{c?.icon || "🏷️"}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5 }}>{c?.name || "—"}</div>
+                      <div style={{ fontSize: 11.5, color: TOKENS.inkSoft }}>rilevata {r.count} volte · {monthLabel(r.firstMonth)} → {monthLabel(r.lastMonth)}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 14 }}>{eur(r.amount)}/mese</div>
+                      <div style={{ fontSize: 11, color: TOKENS.inkSoft }}>≈ {eur(r.annualEstimate)}/anno</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p style={{ fontSize: 12, color: TOKENS.inkSoft, marginTop: 10 }}>Individuate cercando stessa categoria e importo simile (±0,50€) presenti in almeno 3 mesi diversi, per almeno metà dei mesi coperti.</p>
           </>
         )}
       </div>

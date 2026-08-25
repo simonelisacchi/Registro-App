@@ -1,5 +1,8 @@
 # Changelog — Registro
 
+## v1.24.1
+- **Disattivato lo zoom con le dita (pinch e doppio tap)**: il meta viewport da solo (`maximum-scale=1, user-scalable=no`) non basta su iOS Safari, che lo ignora volutamente per motivi di accessibilità. Aggiunto anche `touch-action: manipulation` via CSS e un piccolo script che intercetta i gesti di pinch e il doppio tap, per bloccare lo zoom in modo affidabile su tutti i dispositivi.
+
 ## v1.24.0
 - **Barra in basso semplificata**: ora ha solo Dashboard, Transazioni, Categorie, Risparmi (prima 6 tab, troppo strette). Analisi e Backup si aprono da un menu dedicato.
 - **Nuovo tasto menu (☰)** in alto a destra nell'header, più grande e prominente del vecchio ingranaggio: apre un menu con Analisi, Backup e Impostazioni (tema, nome, data di nascita — quello che prima era dietro l'icona ⚙). Il pallino d'avviso per problemi di sincronizzazione, prima sulla tab Backup, ora compare sia sul tasto menu che sulla voce Backup al suo interno, così resta visibile anche senza aprire il menu.

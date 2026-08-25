@@ -57,7 +57,7 @@
     }
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: var(--paper); overscroll-behavior-y: none; }
+  html, body { margin: 0; padding: 0; background: var(--paper); overscroll-behavior-y: none; touch-action: manipulation; }
   #root { min-height: 100vh; }
   ::selection { background: var(--amber); opacity: 0.4; }
   input, select, textarea, button { font-family: 'Inter', sans-serif; }
@@ -131,7 +131,7 @@ const DEFAULT_CATEGORIES = [
   { id: "altro-i", name: "Paghetta", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const APP_VERSION = "1.24.0";
+const APP_VERSION = "1.24.1";
 const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
@@ -2255,6 +2255,20 @@ const btnPrimary = { display: "flex", alignItems: "center", gap: 6, padding: "9p
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<App />);
 
+</script>
+<script>
+  // Blocca lo zoom con due dita (pinch) e col doppio tap. Il meta viewport da solo
+  // (maximum-scale=1, user-scalable=no) non basta su iOS Safari, che lo ignora
+  // volutamente per accessibilità: serve intercettare anche i gesti a livello JS.
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("gesturechange", function (e) { e.preventDefault(); });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+  var lastTouchEnd = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, false);
 </script>
 </body>
 </html>

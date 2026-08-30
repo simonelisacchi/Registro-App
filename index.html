@@ -131,176 +131,287 @@ const DEFAULT_CATEGORIES = [
   { id: "altro-i", name: "Paghetta", icon: "➕", color: "#2F6F5E", type: "income" },
 ];
 
-const APP_VERSION = "1.25.0";
-const APPS_SCRIPT_CODE = `function getSheetForDate(ss, dateStr) {
+const APP_VERSION = "1.26.0";
+const APPS_SCRIPT_CODE = `// Chiave di sincronizzazione: genera una stringa lunga e casuale (es. da 1password.com/password-generator)
+// e sostituisci il segnaposto qui sotto. Poi incolla la STESSA chiave nell'app, in Backup, nel campo
+// "Chiave di sincronizzazione", su ogni dispositivo. Senza la chiave giusta, il foglio rifiuta tutto:
+// è quello che protegge i tuoi dati anche se il link dell'app o dello script dovesse trapelare.
+const SYNC_SECRET_ATTESA = "INCOLLA-QUI-UNA-CHIAVE-LUNGA-E-CASUALE";
+
+function verificaAccesso(chiave) {
+  if (!chiave) return { ok: false, errore: "Chiave di sincronizzazione mancante: controlla il campo apposito nelle Impostazioni di Backup." };
+  if (chiave !== SYNC_SECRET_ATTESA) return { ok: false, errore: "Chiave di sincronizzazione non valida: controlla che corrisponda esattamente a SYNC_SECRET_ATTESA qui nello script." };
+  return { ok: true };
+}
+
+// Colonne che devono restare NUMERI veri (per poterle sommare nel foglio). Tutte le altre
+// vengono forzate a "testo semplice", altrimenti Google Sheets potrebbe trasformare da sola
+// un valore che assomiglia a una data o un numero (es. una nota "8/3" diventa il 3 agosto).
+const COLONNE_NUMERICHE = { transazioni: ["Importo"], categorie: ["Budget"], risparmi: ["Importo"], profilo: [], archivio: ["Totale"] };
+
+function impostaColonneComeTesto(sheet, intestazione, tipo) {
+  var numeriche = COLONNE_NUMERICHE[tipo] || [];
+  var RIGHE_MARGINE = 5000; // ampio margine per la crescita futura del foglio
+  intestazione.forEach(function(nome, indice) {
+    if (numeriche.indexOf(nome) !== -1) return;
+    sheet.getRange(1, indice + 1, RIGHE_MARGINE, 1).setNumberFormat("@");
+  });
+}
+
+// Scrive una riga forzando il formato testo colonna per colonna, appena prima di scrivere:
+// così ogni singola scrittura resta al riparo dalla conversione automatica di Google Sheets,
+// indipendentemente dal margine già preparato in anticipo su impostaColonneComeTesto.
+function scriviRigaConFormato(sheet, numeroRiga, valori, intestazione, tipo) {
+  var numeriche = COLONNE_NUMERICHE[tipo] || [];
+  var formati = intestazione.map(function(nome) { return numeriche.indexOf(nome) !== -1 ? "General" : "@"; });
+  var range = sheet.getRange(numeroRiga, 1, 1, valori.length);
+  range.setNumberFormats([formati]);
+  range.setValues([valori]);
+}
+
+var INTESTAZIONE_TRANSAZIONI = ["ID","Tipo","Importo","Categoria","Data","Nota","Viaggio","Eliminato","AggiornatoIl"];
+var INTESTAZIONE_CATEGORIE = ["ID","Nome","Icona","Colore","Tipo","Budget","Eliminato","AggiornatoIl"];
+var INTESTAZIONE_RISPARMI = ["ID","Tipo","Importo","Data","Nota","Eliminato","AggiornatoIl"];
+var INTESTAZIONE_PROFILO = ["Nome","DataNascita","AggiornatoIl"];
+var INTESTAZIONE_ARCHIVIO = ["Anno","Categoria","Totale"];
+
+function getSheetForDate(ss, dateStr) {
   var year = String(dateStr).slice(0, 4);
   var sheet = ss.getSheetByName(year);
   if (!sheet) {
     sheet = ss.insertSheet(year);
-    sheet.appendRow(['ID','Tipo','Importo','Categoria','Data','Nota','Viaggio','Eliminato']);
+    sheet.appendRow(INTESTAZIONE_TRANSAZIONI);
+    impostaColonneComeTesto(sheet, INTESTAZIONE_TRANSAZIONI, "transazioni");
   }
   return sheet;
 }
 
-function markDeletedById(sheet, id, col) {
+// Marca una riga come eliminata e ne timbra anche l'AggiornatoIl: serve all'app per sapere
+// che quella cancellazione è più recente di un'eventuale modifica arrivata da un altro dispositivo.
+function markDeletedById(sheet, id, colEliminato, colAggiornatoIl) {
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === id) { sheet.getRange(i + 1, col).setValue(true); return true; }
+    if (data[i][0] === id) {
+      sheet.getRange(i + 1, colEliminato).setValue(true);
+      if (colAggiornatoIl) sheet.getRange(i + 1, colAggiornatoIl).setNumberFormat("@").setValue(new Date().toISOString());
+      return true;
+    }
   }
   return false;
 }
 
+function rigaTransazione(t) {
+  return [t.id, t.type, t.amount, t.categoryName, t.date, t.note || "", t.trip || "", false, t.aggiornatoIl || new Date().toISOString()];
+}
+
 function doPost(e) {
-  var body = JSON.parse(e.postData.contents);
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  if (body.action === 'append') {
-    var t = body.tx;
-    var sheet = getSheetForDate(ss, t.date);
-    sheet.appendRow([t.id, t.type, t.amount, t.categoryName, t.date, t.note || '', t.trip || '', false]);
-
-  } else if (body.action === 'delete') {
-    ss.getSheets().forEach(function(sheet) {
-      if (!/^\\d{4}$/.test(sheet.getName())) return;
-      markDeletedById(sheet, body.id, 8);
-    });
-
-  } else if (body.action === 'update') {
-    ss.getSheets().forEach(function(sheet) {
-      if (!/^\\d{4}$/.test(sheet.getName())) return;
-      markDeletedById(sheet, body.id, 8);
-    });
-    var ut = body.tx;
-    var usheet = getSheetForDate(ss, ut.date);
-    usheet.appendRow([ut.id, ut.type, ut.amount, ut.categoryName, ut.date, ut.note || '', ut.trip || '', false]);
-
-  } else if (body.action === 'bulk') {
-    var byYear = {};
-    body.txs.forEach(function(t) {
-      var y = String(t.date).slice(0, 4);
-      if (!byYear[y]) byYear[y] = [];
-      byYear[y].push(t);
-    });
-    Object.keys(byYear).forEach(function(y) {
-      var sheet = getSheetForDate(ss, byYear[y][0].date);
-      var existing = sheet.getDataRange().getValues().slice(1).map(function(r){ return r[0]; });
-      byYear[y].forEach(function(t) {
-        if (existing.indexOf(t.id) === -1) {
-          sheet.appendRow([t.id, t.type, t.amount, t.categoryName, t.date, t.note || '', t.trip || '', false]);
-        }
-      });
-    });
-
-  } else if (body.action === 'closeYear') {
-    var year = String(body.year);
-    var arch = ss.getSheetByName('Archivio') || ss.insertSheet('Archivio');
-    if (arch.getLastRow() === 0) arch.appendRow(['Anno', 'Categoria', 'Totale']);
-    var adata = arch.getDataRange().getValues();
-    for (var j = adata.length - 1; j >= 1; j--) {
-      if (String(adata[j][0]) === year) arch.deleteRow(j + 1);
+  try {
+    var body = JSON.parse(e.postData.contents);
+    var accesso = verificaAccesso(body.secret);
+    if (!accesso.ok) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, errore: accesso.errore })).setMimeType(ContentService.MimeType.JSON);
     }
-    (body.categories || []).forEach(function(c) {
-      arch.appendRow([year, c.name, c.total]);
-    });
-    arch.appendRow([year, '__Entrate__', body.totalIncome || 0]);
-    var yearSheet = ss.getSheetByName(year);
-    if (yearSheet) ss.deleteSheet(yearSheet);
 
-  } else if (body.action === 'categoriesSync') {
-    var csheet = ss.getSheetByName('Categorie') || ss.insertSheet('Categorie');
-    if (csheet.getLastRow() === 0) csheet.appendRow(['ID', 'Nome', 'Icona', 'Colore', 'Tipo', 'Budget', 'Eliminato']);
-    var cdata = csheet.getDataRange().getValues();
-    var idRow = {};
-    for (var ci = 1; ci < cdata.length; ci++) idRow[cdata[ci][0]] = ci + 1;
-    (body.categories || []).forEach(function(c) {
-      var row = [c.id, c.name, c.icon, c.color, c.type, c.budget || 0, false];
-      if (idRow[c.id]) csheet.getRange(idRow[c.id], 1, 1, 7).setValues([row]);
-      else { csheet.appendRow(row); idRow[c.id] = csheet.getLastRow(); }
-    });
+    // Se due dispositivi sincronizzano quasi nello stesso istante, questo blocco fa aspettare
+    // il secondo finché il primo non ha finito di scrivere: senza, entrambi potrebbero non
+    // accorgersi l'uno dell'altro e creare la stessa riga due volte invece di aggiornarla.
+    var lock = LockService.getScriptLock();
+    var ottenuto = lock.tryLock(30000);
+    if (!ottenuto) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, errore: "Il foglio è occupato da un'altra sincronizzazione in corso: riprova tra un attimo." })).setMimeType(ContentService.MimeType.JSON);
+    }
 
-  } else if (body.action === 'categoryDelete') {
-    var csheet2 = ss.getSheetByName('Categorie');
-    if (csheet2) markDeletedById(csheet2, body.id, 7);
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  } else if (body.action === 'savingAppend') {
-    var ssheet = ss.getSheetByName('Risparmi') || ss.insertSheet('Risparmi');
-    if (ssheet.getLastRow() === 0) ssheet.appendRow(['ID', 'Tipo', 'Importo', 'Data', 'Nota', 'Eliminato']);
-    var sv = body.saving;
-    ssheet.appendRow([sv.id, sv.type, sv.amount, sv.date, sv.note || '', false]);
+      if (body.action === "append") {
+        var t = body.tx;
+        var sheet = getSheetForDate(ss, t.date);
+        scriviRigaConFormato(sheet, sheet.getLastRow() + 1, rigaTransazione(t), INTESTAZIONE_TRANSAZIONI, "transazioni");
 
-  } else if (body.action === 'savingDelete') {
-    var ssheet2 = ss.getSheetByName('Risparmi');
-    if (ssheet2) markDeletedById(ssheet2, body.id, 6);
+      } else if (body.action === "delete") {
+        ss.getSheets().forEach(function(sheet) {
+          if (!/^\\d{4}$/.test(sheet.getName())) return;
+          markDeletedById(sheet, body.id, 8, 9);
+        });
 
-  } else if (body.action === 'profileSync') {
-    var psheet = ss.getSheetByName('Profilo') || ss.insertSheet('Profilo');
-    if (psheet.getLastRow() === 0) psheet.appendRow(['Nome', 'DataNascita']);
-    var prow = [body.name || '', body.birthdate || ''];
-    if (psheet.getLastRow() < 2) psheet.appendRow(prow);
-    else psheet.getRange(2, 1, 1, 2).setValues([prow]);
+      } else if (body.action === "update") {
+        ss.getSheets().forEach(function(sheet) {
+          if (!/^\\d{4}$/.test(sheet.getName())) return;
+          markDeletedById(sheet, body.id, 8, 9);
+        });
+        var ut = body.tx;
+        var usheet = getSheetForDate(ss, ut.date);
+        scriviRigaConFormato(usheet, usheet.getLastRow() + 1, rigaTransazione(ut), INTESTAZIONE_TRANSAZIONI, "transazioni");
+
+      } else if (body.action === "bulk") {
+        var byYear = {};
+        body.txs.forEach(function(t) {
+          var y = String(t.date).slice(0, 4);
+          if (!byYear[y]) byYear[y] = [];
+          byYear[y].push(t);
+        });
+        Object.keys(byYear).forEach(function(y) {
+          var sheet = getSheetForDate(ss, byYear[y][0].date);
+          var existing = sheet.getDataRange().getValues().slice(1).map(function(r){ return r[0]; });
+          byYear[y].forEach(function(t) {
+            if (existing.indexOf(t.id) === -1) {
+              scriviRigaConFormato(sheet, sheet.getLastRow() + 1, rigaTransazione(t), INTESTAZIONE_TRANSAZIONI, "transazioni");
+            }
+          });
+        });
+
+      } else if (body.action === "closeYear") {
+        var year = String(body.year);
+        var arch = ss.getSheetByName("Archivio");
+        if (!arch) { arch = ss.insertSheet("Archivio"); arch.appendRow(INTESTAZIONE_ARCHIVIO); impostaColonneComeTesto(arch, INTESTAZIONE_ARCHIVIO, "archivio"); }
+        else if (arch.getLastRow() === 0) { arch.appendRow(INTESTAZIONE_ARCHIVIO); impostaColonneComeTesto(arch, INTESTAZIONE_ARCHIVIO, "archivio"); }
+        var adata = arch.getDataRange().getValues();
+        for (var j = adata.length - 1; j >= 1; j--) {
+          if (String(adata[j][0]) === year) arch.deleteRow(j + 1);
+        }
+        (body.categories || []).forEach(function(c) {
+          scriviRigaConFormato(arch, arch.getLastRow() + 1, [year, c.name, c.total], INTESTAZIONE_ARCHIVIO, "archivio");
+        });
+        scriviRigaConFormato(arch, arch.getLastRow() + 1, [year, "__Entrate__", body.totalIncome || 0], INTESTAZIONE_ARCHIVIO, "archivio");
+        var yearSheet = ss.getSheetByName(year);
+        if (yearSheet) ss.deleteSheet(yearSheet);
+
+      } else if (body.action === "categoriesSync") {
+        var csheet = ss.getSheetByName("Categorie");
+        if (!csheet) { csheet = ss.insertSheet("Categorie"); csheet.appendRow(INTESTAZIONE_CATEGORIE); impostaColonneComeTesto(csheet, INTESTAZIONE_CATEGORIE, "categorie"); }
+        else if (csheet.getLastRow() === 0) { csheet.appendRow(INTESTAZIONE_CATEGORIE); impostaColonneComeTesto(csheet, INTESTAZIONE_CATEGORIE, "categorie"); }
+        var cdata = csheet.getDataRange().getValues();
+        var idRow = {};
+        for (var ci = 1; ci < cdata.length; ci++) idRow[cdata[ci][0]] = ci + 1;
+        (body.categories || []).forEach(function(c) {
+          var row = [c.id, c.name, c.icon, c.color, c.type, c.budget || 0, false, c.aggiornatoIl || new Date().toISOString()];
+          var numeroRiga = idRow[c.id] || (csheet.getLastRow() + 1);
+          scriviRigaConFormato(csheet, numeroRiga, row, INTESTAZIONE_CATEGORIE, "categorie");
+          idRow[c.id] = numeroRiga;
+        });
+
+      } else if (body.action === "categoryDelete") {
+        var csheet2 = ss.getSheetByName("Categorie");
+        if (csheet2) markDeletedById(csheet2, body.id, 7, 8);
+
+      } else if (body.action === "savingAppend") {
+        var ssheet = ss.getSheetByName("Risparmi");
+        if (!ssheet) { ssheet = ss.insertSheet("Risparmi"); ssheet.appendRow(INTESTAZIONE_RISPARMI); impostaColonneComeTesto(ssheet, INTESTAZIONE_RISPARMI, "risparmi"); }
+        else if (ssheet.getLastRow() === 0) { ssheet.appendRow(INTESTAZIONE_RISPARMI); impostaColonneComeTesto(ssheet, INTESTAZIONE_RISPARMI, "risparmi"); }
+        var sv = body.saving;
+        var svRiga = [sv.id, sv.type, sv.amount, sv.date, sv.note || "", false, sv.aggiornatoIl || new Date().toISOString()];
+        scriviRigaConFormato(ssheet, ssheet.getLastRow() + 1, svRiga, INTESTAZIONE_RISPARMI, "risparmi");
+
+      } else if (body.action === "savingDelete") {
+        var ssheet2 = ss.getSheetByName("Risparmi");
+        if (ssheet2) markDeletedById(ssheet2, body.id, 6, 7);
+
+      } else if (body.action === "profileSync") {
+        var psheet = ss.getSheetByName("Profilo");
+        if (!psheet) { psheet = ss.insertSheet("Profilo"); psheet.appendRow(INTESTAZIONE_PROFILO); impostaColonneComeTesto(psheet, INTESTAZIONE_PROFILO, "profilo"); }
+        else if (psheet.getLastRow() === 0) { psheet.appendRow(INTESTAZIONE_PROFILO); impostaColonneComeTesto(psheet, INTESTAZIONE_PROFILO, "profilo"); }
+        var prow = [body.name || "", body.birthdate || "", new Date().toISOString()];
+        scriviRigaConFormato(psheet, 2, prow, INTESTAZIONE_PROFILO, "profilo");
+
+      } else {
+        return ContentService.createTextOutput(JSON.stringify({ ok: false, errore: "Azione non riconosciuta." })).setMimeType(ContentService.MimeType.JSON);
+      }
+    } finally {
+      lock.releaseLock();
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, errore: String(err) })).setMimeType(ContentService.MimeType.JSON);
   }
-  return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function doGet(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var tz = Session.getScriptTimeZone();
-  var out = { transactions: [], archives: [], categories: [], savings: [], deletedTransactionIds: [], deletedCategoryIds: [], deletedSavingIds: [], profile: null };
+  try {
+    var accesso = verificaAccesso(e.parameter.secret);
+    if (!accesso.ok) {
+      return ContentService.createTextOutput(JSON.stringify({ errore: accesso.errore })).setMimeType(ContentService.MimeType.JSON);
+    }
 
-  ss.getSheets().forEach(function(sheet) {
-    if (!/^\\d{4}$/.test(sheet.getName())) return;
-    if (sheet.getLastRow() <= 1) return;
-    var rows = sheet.getDataRange().getValues().slice(1);
-    rows.forEach(function(r) {
-      if (r[7] === true) { out.deletedTransactionIds.push(r[0]); return; }
-      var d = r[4];
-      var dateStr = (d instanceof Date) ? Utilities.formatDate(d, tz, 'yyyy-MM-dd') : String(d);
-      out.transactions.push({ id: r[0], type: r[1], amount: r[2], categoryName: r[3], date: dateStr, note: r[5] || '', trip: r[6] || '' });
-    });
-  });
+    // Stesso blocco usato in doPost: se qualcuno sta scrivendo proprio in questo istante,
+    // aspetta che finisca prima di leggere, per non vedere il foglio a metà di una scrittura.
+    var lock = LockService.getScriptLock();
+    var ottenuto = lock.tryLock(20000);
+    if (!ottenuto) {
+      return ContentService.createTextOutput(JSON.stringify({ errore: "Il foglio è occupato da un'altra sincronizzazione in corso: riprova tra un attimo." })).setMimeType(ContentService.MimeType.JSON);
+    }
 
-  var arch = ss.getSheetByName('Archivio');
-  if (arch && arch.getLastRow() > 1) {
-    var byYear = {};
-    var incomeByYear = {};
-    arch.getDataRange().getValues().slice(1).forEach(function(r) {
-      var y = String(r[0]);
-      if (r[1] === '__Entrate__') { incomeByYear[y] = r[2]; return; }
-      if (!byYear[y]) byYear[y] = {};
-      byYear[y][r[1]] = r[2];
-    });
-    Object.keys(byYear).forEach(function(y) {
-      out.archives.push({ year: y, categoryTotals: byYear[y], income: incomeByYear[y] || 0 });
-    });
+    var out;
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var tz = Session.getScriptTimeZone();
+      out = { transactions: [], archives: [], categories: [], savings: [], deletedTransactionIds: [], deletedCategoryIds: [], deletedSavingIds: [], profile: null };
+
+      ss.getSheets().forEach(function(sheet) {
+        if (!/^\\d{4}$/.test(sheet.getName())) return;
+        if (sheet.getLastRow() <= 1) return;
+        var rows = sheet.getDataRange().getValues().slice(1);
+        rows.forEach(function(r) {
+          if (r[7] === true) { out.deletedTransactionIds.push(r[0]); return; }
+          var d = r[4];
+          var dateStr = (d instanceof Date) ? Utilities.formatDate(d, tz, "yyyy-MM-dd") : String(d);
+          var agg = r[8];
+          var aggStr = (agg instanceof Date) ? agg.toISOString() : String(agg || "");
+          out.transactions.push({ id: r[0], type: r[1], amount: r[2], categoryName: r[3], date: dateStr, note: r[5] || "", trip: r[6] || "", aggiornatoIl: aggStr });
+        });
+      });
+
+      var arch = ss.getSheetByName("Archivio");
+      if (arch && arch.getLastRow() > 1) {
+        var byYear = {};
+        var incomeByYear = {};
+        arch.getDataRange().getValues().slice(1).forEach(function(r) {
+          var y = String(r[0]);
+          if (r[1] === "__Entrate__") { incomeByYear[y] = r[2]; return; }
+          if (!byYear[y]) byYear[y] = {};
+          byYear[y][r[1]] = r[2];
+        });
+        Object.keys(byYear).forEach(function(y) {
+          out.archives.push({ year: y, categoryTotals: byYear[y], income: incomeByYear[y] || 0 });
+        });
+      }
+
+      var csheet3 = ss.getSheetByName("Categorie");
+      if (csheet3 && csheet3.getLastRow() > 1) {
+        csheet3.getDataRange().getValues().slice(1).forEach(function(r) {
+          if (r[6] === true) { out.deletedCategoryIds.push(r[0]); return; }
+          var cagg = r[7];
+          out.categories.push({ id: r[0], name: r[1], icon: r[2], color: r[3], type: r[4], budget: r[5] || 0, aggiornatoIl: (cagg instanceof Date) ? cagg.toISOString() : String(cagg || "") });
+        });
+      }
+
+      var ssheet3 = ss.getSheetByName("Risparmi");
+      if (ssheet3 && ssheet3.getLastRow() > 1) {
+        ssheet3.getDataRange().getValues().slice(1).forEach(function(r) {
+          if (r[5] === true) { out.deletedSavingIds.push(r[0]); return; }
+          var sd = r[3];
+          var sdateStr = (sd instanceof Date) ? Utilities.formatDate(sd, tz, "yyyy-MM-dd") : String(sd);
+          var sagg = r[6];
+          out.savings.push({ id: r[0], type: r[1], amount: r[2], date: sdateStr, note: r[4] || "", aggiornatoIl: (sagg instanceof Date) ? sagg.toISOString() : String(sagg || "") });
+        });
+      }
+
+      var psheet3 = ss.getSheetByName("Profilo");
+      if (psheet3 && psheet3.getLastRow() > 1) {
+        var prow = psheet3.getDataRange().getValues()[1];
+        var pbirth = prow[1];
+        var pbirthStr = (pbirth instanceof Date) ? Utilities.formatDate(pbirth, tz, "yyyy-MM-dd") : String(pbirth || "");
+        out.profile = { name: prow[0] || "", birthdate: pbirthStr };
+      }
+    } finally {
+      lock.releaseLock();
+    }
+
+    return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ errore: String(err) })).setMimeType(ContentService.MimeType.JSON);
   }
-
-  var csheet3 = ss.getSheetByName('Categorie');
-  if (csheet3 && csheet3.getLastRow() > 1) {
-    csheet3.getDataRange().getValues().slice(1).forEach(function(r) {
-      if (r[6] === true) { out.deletedCategoryIds.push(r[0]); return; }
-      out.categories.push({ id: r[0], name: r[1], icon: r[2], color: r[3], type: r[4], budget: r[5] || 0 });
-    });
-  }
-
-  var ssheet3 = ss.getSheetByName('Risparmi');
-  if (ssheet3 && ssheet3.getLastRow() > 1) {
-    ssheet3.getDataRange().getValues().slice(1).forEach(function(r) {
-      if (r[5] === true) { out.deletedSavingIds.push(r[0]); return; }
-      var sd = r[3];
-      var sdateStr = (sd instanceof Date) ? Utilities.formatDate(sd, tz, 'yyyy-MM-dd') : String(sd);
-      out.savings.push({ id: r[0], type: r[1], amount: r[2], date: sdateStr, note: r[4] || '' });
-    });
-  }
-
-  var psheet3 = ss.getSheetByName('Profilo');
-  if (psheet3 && psheet3.getLastRow() > 1) {
-    var prow = psheet3.getDataRange().getValues()[1];
-    var pbirth = prow[1];
-    var pbirthStr = (pbirth instanceof Date) ? Utilities.formatDate(pbirth, tz, 'yyyy-MM-dd') : String(pbirth || '');
-    out.profile = { name: prow[0] || '', birthdate: pbirthStr };
-  }
-
-  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }`;
 
 const LEVELS_UNUSED = null;
@@ -341,6 +452,20 @@ function saveKey(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { console.error("storage error", key, e); }
 }
 
+// Richiesta GET al foglio Google, con la chiave di sincronizzazione sempre inclusa.
+// Restituisce null se non c'è un URL configurato, e solleva un errore leggibile se
+// il server rifiuta la richiesta (es. chiave sbagliata) o non risponde bene.
+async function fetchFromSheet() {
+  const url = loadKey("sheet-url", "");
+  if (!url) return null;
+  const secret = loadKey("sheet-secret", "");
+  const res = await fetch(`${url}?secret=${encodeURIComponent(secret)}`, { method: "GET" });
+  if (!res.ok) throw new Error("il foglio ha risposto con un errore (" + res.status + ")");
+  const data = await res.json();
+  if (data && data.errore) throw new Error(data.errore);
+  return data;
+}
+
 function App() {
   const [tab, setTab] = useState("dashboard");
   const [categories, setCategories] = useState(() => loadKey("categories", DEFAULT_CATEGORIES));
@@ -350,6 +475,7 @@ function App() {
   const [profileName, setProfileNameState] = useState(() => loadKey("profile-name", ""));
   const [profileBirthdate, setProfileBirthdateState] = useState(() => loadKey("profile-birthdate", ""));
   const [sheetUrl, setSheetUrlState] = useState(() => loadKey("sheet-url", ""));
+  const [sheetSecret, setSheetSecretState] = useState(() => loadKey("sheet-secret", ""));
   const [lastSync, setLastSync] = useState(() => loadKey("last-sync", ""));
   const [lastPull, setLastPull] = useState(() => loadKey("last-pull", ""));
   const [syncing, setSyncing] = useState(false);
@@ -437,24 +563,24 @@ function App() {
       const res = await fetch(sheetUrl, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, secret: loadKey("sheet-secret", "") }),
       });
       const text = await res.text();
       let json;
       try { json = JSON.parse(text); } catch (parseErr) { throw new Error("il foglio non ha risposto con dati validi: " + text.slice(0, 120)); }
-      if (!res.ok || !json || json.ok !== true) throw new Error("il foglio ha segnalato un errore");
+      if (!res.ok || !json || json.ok !== true) throw new Error(json && json.errore ? json.errore : "il foglio ha segnalato un errore");
       const ts = new Date().toISOString();
       setLastSync(ts); saveKey("last-sync", ts);
       showToast("Sincronizzato ✓", "success");
     } catch (e) {
       console.error("sync error, messo in coda per riprovare al ritorno della rete", e);
       queueAdd(payload);
-      showToast("Non sincronizzato — in coda, riproverà da solo", "warn");
+      showToast(e && e.message && e.message.indexOf("Chiave di sincronizzazione") !== -1 ? e.message : "Non sincronizzato — in coda, riproverà da solo", "warn");
     }
   }
 
   function addTransaction(tx) {
-    const full = { ...tx, id: uid() };
+    const full = { ...tx, id: uid(), aggiornatoIl: new Date().toISOString() };
     const next = [full, ...transactions];
     setTransactions(next); saveKey("transactions", next);
     pushToSheet({ action: "append", tx: { ...full, categoryName: catMap[full.categoryId]?.name || full.categoryId } });
@@ -465,14 +591,14 @@ function App() {
     pushToSheet({ action: "delete", id });
   }
   function updateTransaction(id, patch) {
-    const next = transactions.map(t => t.id === id ? { ...t, ...patch } : t);
+    const next = transactions.map(t => t.id === id ? { ...t, ...patch, aggiornatoIl: new Date().toISOString() } : t);
     setTransactions(next); saveKey("transactions", next);
     const updated = next.find(t => t.id === id);
     pushToSheet({ action: "update", id, tx: { ...updated, categoryName: catMap[updated.categoryId]?.name || updated.categoryId } });
   }
 
   function pushCategoriesToSheet(cats) {
-    const payload = cats.map(c => ({ id: c.id, name: c.name, icon: c.icon, color: c.color, type: c.type, budget: c.budget || 0 }));
+    const payload = cats.map(c => ({ id: c.id, name: c.name, icon: c.icon, color: c.color, type: c.type, budget: c.budget || 0, aggiornatoIl: c.aggiornatoIl || new Date().toISOString() }));
     pushToSheet({ action: "categoriesSync", categories: payload });
   }
   function pushCategoriesDebounced(cats) {
@@ -492,12 +618,12 @@ function App() {
     pushProfileDebounced(name, birthdate);
   }
   function addCategory(cat) {
-    const next = [...categories, { ...cat, id: uid() }];
+    const next = [...categories, { ...cat, id: uid(), aggiornatoIl: new Date().toISOString() }];
     setCategories(next); saveKey("categories", next);
     pushCategoriesToSheet(next);
   }
   function updateCategory(id, patch) {
-    const next = categories.map(c => c.id === id ? { ...c, ...patch } : c);
+    const next = categories.map(c => c.id === id ? { ...c, ...patch, aggiornatoIl: new Date().toISOString() } : c);
     setCategories(next); saveKey("categories", next);
     pushCategoriesDebounced(next);
   }
@@ -511,17 +637,17 @@ function App() {
       let altro = categories.find(c => c.type === cat.type && c.name.trim().toLowerCase() === "altro");
       let nextCats = categories;
       if (!altro) {
-        altro = { id: uid(), name: "Altro", icon: "➕", color: "#8A8578", type: cat.type, budget: 0 };
+        altro = { id: uid(), name: "Altro", icon: "➕", color: "#8A8578", type: cat.type, budget: 0, aggiornatoIl: new Date().toISOString() };
         nextCats = [...categories, altro];
       }
-      const nextTx = transactions.map(t => t.categoryId === id ? { ...t, categoryId: altro.id } : t);
+      const nextTx = transactions.map(t => t.categoryId === id ? { ...t, categoryId: altro.id, aggiornatoIl: new Date().toISOString() } : t);
       setTransactions(nextTx); saveKey("transactions", nextTx);
       const finalCats = nextCats.filter(c => c.id !== id);
       setCategories(finalCats); saveKey("categories", finalCats);
       pushCategoriesToSheet(finalCats);
       pushToSheet({ action: "categoryDelete", id });
-      affected.forEach(t => {
-        pushToSheet({ action: "update", id: t.id, tx: { ...t, categoryId: altro.id, categoryName: altro.name } });
+      nextTx.filter(t => t.categoryId === altro.id).forEach(t => {
+        pushToSheet({ action: "update", id: t.id, tx: { ...t, categoryName: altro.name } });
       });
       return;
     }
@@ -532,7 +658,7 @@ function App() {
   }
 
   function addSaving(entry) {
-    const full = { ...entry, id: uid() };
+    const full = { ...entry, id: uid(), aggiornatoIl: new Date().toISOString() };
     const next = [full, ...savings];
     setSavings(next); saveKey("savings", next);
     pushToSheet({ action: "savingAppend", saving: full });
@@ -619,15 +745,14 @@ function App() {
     if (!window.confirm("Questo sostituirà transazioni, categorie, risparmi e archivi salvati su questo dispositivo con quelli presenti nel foglio Google. Continuare?")) return;
     setPulling(true);
     try {
-      const res = await fetch(sheetUrl, { method: "GET" });
-      const data = await res.json();
+      const data = await fetchFromSheet();
       const byName = {};
       let newCats = [...categories];
       newCats.forEach(c => { byName[c.name.toLowerCase()] = c.id; });
       function ensureCat(name, type) {
         let id = byName[(name || "").toLowerCase()];
         if (!id) {
-          const nc = { id: uid(), name: name || "Altro", icon: "🏷️", color: "#8A8578", type: type || "expense", budget: 0 };
+          const nc = { id: uid(), name: name || "Altro", icon: "🏷️", color: "#8A8578", type: type || "expense", budget: 0, aggiornatoIl: new Date().toISOString() };
           newCats.push(nc); byName[nc.name.toLowerCase()] = nc.id; id = nc.id;
         }
         return id;
@@ -635,7 +760,7 @@ function App() {
       const archivedYears = new Set((data.archives || []).map(a => a.year));
       const mapped = (data.transactions || [])
         .filter(t => !archivedYears.has(String(t.date).slice(0, 4)))
-        .map(t => ({ id: t.id, type: t.type, amount: parseFloat(t.amount) || 0, categoryId: ensureCat(t.categoryName, t.type), date: t.date, note: t.note || "", trip: t.trip || "" }));
+        .map(t => ({ id: t.id, type: t.type, amount: parseFloat(t.amount) || 0, categoryId: ensureCat(t.categoryName, t.type), date: t.date, note: t.note || "", trip: t.trip || "", aggiornatoIl: t.aggiornatoIl || new Date().toISOString() }));
       const mappedArchives = (data.archives || []).map(a => {
         const categoryTotals = {};
         const categoryNames = {};
@@ -651,14 +776,14 @@ function App() {
       if (Array.isArray(data.categories)) {
         const byId = Object.fromEntries(newCats.map(c => [c.id, c]));
         data.categories.forEach(rc => {
-          const incoming = { id: rc.id, name: rc.name, icon: rc.icon, color: rc.color, type: rc.type, budget: parseFloat(rc.budget) || 0 };
+          const incoming = { id: rc.id, name: rc.name, icon: rc.icon, color: rc.color, type: rc.type, budget: parseFloat(rc.budget) || 0, aggiornatoIl: rc.aggiornatoIl || new Date().toISOString() };
           if (byId[rc.id]) Object.assign(byId[rc.id], incoming);
           else { newCats.push(incoming); byId[rc.id] = incoming; }
         });
       }
       const deletedCatIds = new Set(data.deletedCategoryIds || []);
       if (deletedCatIds.size > 0) newCats = newCats.filter(c => !deletedCatIds.has(c.id));
-      const mappedSavings = (data.savings || []).map(s => ({ id: s.id, type: s.type, amount: parseFloat(s.amount) || 0, date: s.date, note: s.note || "" }));
+      const mappedSavings = (data.savings || []).map(s => ({ id: s.id, type: s.type, amount: parseFloat(s.amount) || 0, date: s.date, note: s.note || "", aggiornatoIl: s.aggiornatoIl || new Date().toISOString() }));
       setCategories(newCats); saveKey("categories", newCats);
       setTransactions(mapped); saveKey("transactions", mapped);
       setArchives(mappedArchives); saveKey("archives", mappedArchives);
@@ -671,24 +796,26 @@ function App() {
       setLastPull(ts); saveKey("last-pull", ts);
     } catch (e) {
       console.error(e);
-      window.alert("Non sono riuscito a leggere dal foglio. Controlla il link nella scheda Backup e riprova.");
+      window.alert((e && e.message) ? e.message : "Non sono riuscito a leggere dal foglio. Controlla il link nella scheda Backup e riprova.");
     }
     setPulling(false);
   }
   function saveSheetUrl(url) { setSheetUrlState(url); saveKey("sheet-url", url); }
+  function saveSheetSecret(secret) { setSheetSecretState(secret); saveKey("sheet-secret", secret); }
 
   async function flushQueue() {
     const url = loadKey("sheet-url", "");
     if (!url) return;
     const q = loadKey("pending-sync", []);
     let sentAny = false;
+    const secret = loadKey("sheet-secret", "");
     for (const item of q) {
       try {
-        const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(item.payload) });
+        const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ ...item.payload, secret }) });
         const text = await res.text();
         let json;
         try { json = JSON.parse(text); } catch (parseErr) { throw new Error("il foglio non ha risposto con dati validi"); }
-        if (!res.ok || !json || json.ok !== true) throw new Error("il foglio ha segnalato un errore");
+        if (!res.ok || !json || json.ok !== true) throw new Error(json && json.errore ? json.errore : "il foglio ha segnalato un errore");
         queueRemove(item.id);
         const ts = new Date().toISOString();
         setLastSync(ts); saveKey("last-sync", ts);
@@ -699,12 +826,9 @@ function App() {
   }
 
   async function checkSyncHealth() {
-    const url = loadKey("sheet-url", "");
-    if (!url) return;
     try {
-      const res = await fetch(url, { method: "GET" });
-      if (!res.ok) throw new Error("bad status");
-      await res.json();
+      const data = await fetchFromSheet();
+      if (!data) return; // nessun URL configurato: non è un errore di salute della sync
       saveKey("sync-fail-streak", 0); setSyncFailStreak(0);
     } catch (e) {
       const streak = loadKey("sync-fail-streak", 0) + 1;
@@ -716,12 +840,10 @@ function App() {
   // (sia in modo "esplicito", marcato Eliminato dall'app, sia perché una riga è semplicemente
   // sparita dal foglio — es. cancellata a mano — purché non fosse ancora in attesa di invio).
   async function mergeFromSheet() {
-    const url = loadKey("sheet-url", "");
-    if (!url) return false;
+    if (!loadKey("sheet-url", "")) return false;
     try {
-      const res = await fetch(url, { method: "GET" });
-      if (!res.ok) return false;
-      const data = await res.json();
+      const data = await fetchFromSheet();
+      if (!data) return false;
       const pending = loadKey("pending-sync", []);
       const pendingTxIds = new Set(pending.map(i => i.payload?.tx?.id || i.payload?.id).filter(Boolean));
       const pendingCatIds = new Set(pending.map(i => (i.payload?.action === "categoriesSync" ? (i.payload.categories || []).map(c => c.id) : [])).flat());
@@ -745,18 +867,20 @@ function App() {
       const sheetTxIds = new Set((data.transactions || []).map(t => t.id));
       const newOnes = (data.transactions || [])
         .filter(t => !localIds.has(t.id) && !archivedYears.has(String(t.date).slice(0, 4)))
-        .map(t => ({ id: t.id, type: t.type, amount: parseFloat(t.amount) || 0, categoryId: ensureCat(t.categoryName, t.type), date: t.date, note: t.note || "", trip: t.trip || "" }));
+        .map(t => ({ id: t.id, type: t.type, amount: parseFloat(t.amount) || 0, categoryId: ensureCat(t.categoryName, t.type), date: t.date, note: t.note || "", trip: t.trip || "", aggiornatoIl: t.aggiornatoIl || new Date().toISOString() }));
       const deletedTxIds = new Set(data.deletedTransactionIds || []);
-      // Margine di sicurezza: un ID generato da uid() include il timestamp di creazione in coda
-      // (in base36, dopo la parte casuale). Una transazione appena creata potrebbe avere l'invio
-      // al foglio ancora in corso — né sul foglio, né "in coda" perché non ha ancora fallito — quindi
-      // per qualche minuto la trattiamo come "da non toccare", invece di considerarla cancellata
-      // altrove solo perché non compare ancora tra i dati appena scaricati.
-      function idAgeMs(id) {
-        const ts = parseInt(String(id).slice(8), 36);
-        if (!isFinite(ts) || ts <= 0) return Infinity;
-        const age = Date.now() - ts;
-        return age >= 0 ? age : Infinity;
+      // Margine di sicurezza basato sul VERO orario dell'ultima modifica locale (aggiornatoIl),
+      // non più su un orario indovinato leggendo l'ID: così la protezione vale anche quando si
+      // MODIFICA una transazione vecchia, non solo quando se ne crea una nuova. Una transazione
+      // appena creata o modificata potrebbe avere l'invio al foglio ancora in corso — né sul
+      // foglio, né "in coda" perché non ha ancora fallito — quindi per qualche minuto la
+      // trattiamo come "da non toccare", invece di considerarla cancellata altrove solo perché
+      // non compare ancora tra i dati appena scaricati.
+      function modificataDiRecente(t) {
+        const iso = t.aggiornatoIl;
+        if (!iso) return false;
+        const eta = Date.now() - new Date(iso).getTime();
+        return eta >= 0 && eta < GRACE_MS;
       }
       const GRACE_MS = 3 * 60 * 1000;
       let mergedTx = [...newOnes, ...localTx];
@@ -767,7 +891,7 @@ function App() {
         if (archivedYears.has(t.date.slice(0, 4))) return true;
         if (sheetTxIds.has(t.id)) return true;
         if (pendingTxIds.has(t.id)) return true; // non ancora inviata da qui, non toccarla
-        if (idAgeMs(t.id) < GRACE_MS) return true; // aggiunta di recente: l'invio potrebbe essere ancora in corso
+        if (modificataDiRecente(t)) return true; // creata/modificata di recente: l'invio potrebbe essere ancora in corso
         return false; // sparita dal foglio senza essere in attesa: considerata eliminata a mano
       });
       if (mergedTx.length !== before1) txChanged = true;
@@ -779,7 +903,7 @@ function App() {
       if (Array.isArray(data.categories)) {
         const byId = Object.fromEntries(cats.map(c => [c.id, c]));
         data.categories.forEach(rc => {
-          const incoming = { id: rc.id, name: rc.name, icon: rc.icon, color: rc.color, type: rc.type, budget: parseFloat(rc.budget) || 0 };
+          const incoming = { id: rc.id, name: rc.name, icon: rc.icon, color: rc.color, type: rc.type, budget: parseFloat(rc.budget) || 0, aggiornatoIl: rc.aggiornatoIl || new Date().toISOString() };
           const existing = byId[rc.id];
           if (!existing) { cats.push(incoming); byId[rc.id] = incoming; catsChanged = true; }
           else if (existing.name !== incoming.name || existing.icon !== incoming.icon || existing.color !== incoming.color || existing.type !== incoming.type || (existing.budget || 0) !== incoming.budget) {
@@ -805,7 +929,7 @@ function App() {
       const sheetSavIds = new Set((data.savings || []).map(s => s.id));
       const newSavings = (data.savings || [])
         .filter(s => !localSavIds.has(s.id))
-        .map(s => ({ id: s.id, type: s.type, amount: parseFloat(s.amount) || 0, date: s.date, note: s.note || "" }));
+        .map(s => ({ id: s.id, type: s.type, amount: parseFloat(s.amount) || 0, date: s.date, note: s.note || "", aggiornatoIl: s.aggiornatoIl || new Date().toISOString() }));
       const deletedSavIds = new Set(data.deletedSavingIds || []);
       let mergedSav = [...newSavings, ...localSav];
       let savChanged = newSavings.length > 0;
@@ -883,8 +1007,10 @@ function App() {
         if (url) {
           const catsPayload = Object.entries(totals).map(([id, total]) => ({ name: catById[id]?.name || names[id]?.name || "Altro", total }));
           try {
-            const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "closeYear", year, categories: catsPayload, totalIncome }) });
-            if (!res.ok) throw new Error("risposta non valida dal foglio");
+            const secret = loadKey("sheet-secret", "");
+            const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "closeYear", year, categories: catsPayload, totalIncome, secret }) });
+            const json = await res.json().catch(() => null);
+            if (!res.ok || !json || json.ok !== true) throw new Error(json && json.errore ? json.errore : "risposta non valida dal foglio");
           } catch (e) { console.error("auto-close sync error", e); }
         }
       }
@@ -1045,7 +1171,7 @@ function App() {
           {tab === "categorie" && <Categorie categories={categories} transactions={transactions} archives={archives} onAdd={addCategory} onUpdate={updateCategory} onRemove={removeCategory} onCloseYear={closeYear} onEditArchiveIncome={setArchiveIncome} />}
           {tab === "analisi" && <Analisi transactions={transactions} categories={categories} catMap={catMap} />}
           {tab === "risparmi" && <Risparmi savings={savings} onAdd={addSaving} onRemove={removeSaving} />}
-          {tab === "backup" && <Backup sheetUrl={sheetUrl} onSaveUrl={saveSheetUrl} lastSync={lastSync} lastPull={lastPull} syncing={syncing} pulling={pulling} onSyncAll={syncAllNow} onPull={pullFromSheet} count={transactions.length} pendingCount={pendingCount} syncFailStreak={syncFailStreak} onExport={exportBackup} onImportFile={importBackupFile} />}
+          {tab === "backup" && <Backup sheetUrl={sheetUrl} onSaveUrl={saveSheetUrl} sheetSecret={sheetSecret} onSaveSecret={saveSheetSecret} lastSync={lastSync} lastPull={lastPull} syncing={syncing} pulling={pulling} onSyncAll={syncAllNow} onPull={pullFromSheet} count={transactions.length} pendingCount={pendingCount} syncFailStreak={syncFailStreak} onExport={exportBackup} onImportFile={importBackupFile} />}
         </main>
 
         <p style={S.footer}>Registro v{APP_VERSION} · vive su questo dispositivo, funziona anche offline. Collega il Backup per portare i dati anche su altri dispositivi.</p>
@@ -2134,8 +2260,10 @@ function SavingForm({ onSubmit }) {
 
 /* ---------- Backup su Google Sheets ---------- */
 
-function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onSyncAll, onPull, count, pendingCount, syncFailStreak, onExport, onImportFile }) {
+function Backup({ sheetUrl, onSaveUrl, sheetSecret, onSaveSecret, lastSync, lastPull, syncing, pulling, onSyncAll, onPull, count, pendingCount, syncFailStreak, onExport, onImportFile }) {
   const [draft, setDraft] = useState(sheetUrl);
+  const [secretDraft, setSecretDraft] = useState(sheetSecret);
+  const [showSecret, setShowSecret] = useState(false);
   const [openGuide, setOpenGuide] = useState(!sheetUrl);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef(null);
@@ -2167,7 +2295,23 @@ function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onS
           <input value={draft} onChange={e=>setDraft(e.target.value)} placeholder="https://script.google.com/macros/s/…/exec" style={inputStyle} />
         </Field>
         <div style={{ marginTop: 10 }}>
-          <button onClick={()=>onSaveUrl(draft.trim())} style={btnPrimary}><span>✓</span> Salva collegamento</button>
+          <Field label="Chiave di sincronizzazione">
+            <div style={{ display: "flex", gap: 6 }}>
+              <input value={secretDraft} onChange={e=>setSecretDraft(e.target.value)} type={showSecret ? "text" : "password"} placeholder="la stessa chiave che hai messo in SYNC_SECRET_ATTESA" style={{ ...inputStyle, flex: 1 }} />
+              <button onClick={()=>setShowSecret(s=>!s)} type="button" style={{ ...btnPrimary, background: TOKENS.paper2, color: TOKENS.ink, padding: "9px 12px" }}>{showSecret ? "🙈" : "👁"}</button>
+            </div>
+          </Field>
+          <p style={{ fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.5, margin: "6px 0 0" }}>
+            Protegge il foglio: senza la chiave giusta, nessuno può leggerlo o scriverci — nemmeno con il link dell'Apps Script. Va generata una volta (una stringa lunga e casuale) e incollata identica sia qui sia nello script (SYNC_SECRET_ATTESA, nella guida qui sotto), su ogni dispositivo.
+          </p>
+        </div>
+        {sheetUrl && !sheetSecret && (
+          <div style={{ ...S.card, padding: "10px 14px", margin: "10px 0 0", background: TOKENS.negativeSoft, boxShadow: "none" }}>
+            <p style={{ fontSize: 13, margin: 0 }}>⚠️ Collegato ma senza chiave: la sincronizzazione fallirà finché non la imposti qui sopra.</p>
+          </div>
+        )}
+        <div style={{ marginTop: 10 }}>
+          <button onClick={()=>{ onSaveUrl(draft.trim()); onSaveSecret(secretDraft.trim()); }} style={btnPrimary}><span>✓</span> Salva collegamento</button>
         </div>
 
         {sheetUrl && (
@@ -2225,12 +2369,13 @@ function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onS
             {[
               "Apri Google Sheets e crea un nuovo foglio vuoto (sarà il tuo backup, non serve intestarlo).",
               "Vai su Estensioni → Apps Script. Si apre un editor con del codice di esempio: cancellalo tutto.",
-              "Incolla il codice qui sotto (tocca l'icona per copiarlo) e salva (icona a forma di dischetto).",
+              "Incolla il codice qui sotto (tocca l'icona per copiarlo).",
+              "Nella prima riga di codice utile, sostituisci INCOLLA-QUI-UNA-CHIAVE-LUNGA-E-CASUALE con una chiave tua: una stringa lunga a caso (va bene un generatore di password, es. 1password.com/password-generator). Poi salva (icona a forma di dischetto).",
               "Clicca su Esegui il deployment → Nuovo deployment → tipo Web app.",
               "Imposta \"Esegui come\": Me, e \"Chi ha accesso\": Chiunque. Poi Esegui il deployment.",
               "Google chiederà di autorizzare lo script al primo avvio: sei tu il proprietario, quindi conferma.",
-              "Copia l'URL che termina in /exec e incollalo nel campo sopra, su ogni dispositivo su cui apri l'app.",
-              "Ogni volta che aggiorni questo codice in futuro: incolla la nuova versione E rifai anche Esegui il deployment → Gestisci i deployment → matita → Versione: Nuova versione → Deploy. Senza questo passaggio, l'URL continua a eseguire il codice vecchio.",
+              "Copia l'URL che termina in /exec e incollalo nel campo \"URL dell'Apps Script\" sopra; incolla la STESSA chiave scelta al passo 4 nel campo \"Chiave di sincronizzazione\". Ripeti su ogni dispositivo su cui apri l'app.",
+              "Ogni volta che aggiorni questo codice in futuro: incolla la nuova versione (mantenendo la tua chiave al posto del segnaposto) E rifai anche Esegui il deployment → Gestisci i deployment → matita → Versione: Nuova versione → Deploy. Senza questo passaggio, l'URL continua a eseguire il codice vecchio.",
             ].map((step, i) => (
               <div key={i} style={{ display: "flex", gap: 10, fontSize: 13.5, lineHeight: 1.5 }}>
                 <span style={{ fontFamily: "'IBM Plex Mono', monospace", color: TOKENS.amber, flexShrink: 0 }}>{String(i+1).padStart(2,"0")}</span>
@@ -2244,7 +2389,7 @@ function Backup({ sheetUrl, onSaveUrl, lastSync, lastPull, syncing, pulling, onS
               </button>
             </div>
             <p style={{ fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.6, marginTop: 4 }}>
-              Nota: l'URL dà lettura e scrittura su quel foglio a chiunque lo conosca — non condividerlo. "Invia tutto al foglio" spedisce le transazioni evitando duplicati; "Carica tutto dal foglio" fa il percorso inverso e sostituisce i dati locali, utile appena apri l'app su un nuovo dispositivo.
+              Nota: da questa versione l'URL da solo non basta più a leggere o scrivere sul foglio — serve anche la chiave. Tienila comunque riservata, come una password: chi avesse entrambe (URL e chiave) avrebbe accesso completo. "Invia tutto al foglio" spedisce le transazioni evitando duplicati; "Carica tutto dal foglio" fa il percorso inverso e sostituisce i dati locali, utile appena apri l'app su un nuovo dispositivo.
             </p>
             <p style={{ fontSize: 12, color: TOKENS.inkSoft, lineHeight: 1.6, marginTop: 0 }}>
               Per tenerlo leggero nel tempo, ci sono due livelli: lo script crea da solo un tab per anno (2026, 2027…) invece di un unico elenco infinito; e quando in Categorie usi "Chiudi un anno", quel tab con le transazioni sparisce del tutto dal foglio e resta solo una riga di totale per categoria nel tab "Archivio" — permanente, leggerissimo, per sempre.

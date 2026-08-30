@@ -1,5 +1,10 @@
 # Changelog — Registro
 
+## v1.25.0
+- **Corretta una perdita di transazioni in rari casi**: se la sincronizzazione automatica partiva mentre una transazione appena creata era ancora in viaggio verso il foglio Google (non ancora arrivata, ma nemmeno "in coda" perché non aveva ancora fallito), veniva scambiata per "cancellata altrove" e rimossa anche in locale. Capita più facilmente di quanto sembri: la sincronizzazione riparte ogni volta che l'app torna in primo piano, quindi salvare una transazione e cambiare subito app può bastare a innescarlo. Ora una transazione appena creata resta protetta per qualche minuto, il tempo che l'invio abbia modo di completarsi o, se fallisce davvero, di finire regolarmente in coda.
+- Corretto anche un controllo troppo permissivo nel reinvio delle transazioni rimaste in coda dopo un errore di rete: verificava solo che il foglio avesse risposto, non che avesse davvero confermato il salvataggio.
+- **Avvisi di budget meno invasivi**: prima ogni categoria oltre budget aggiungeva una card intera in cima alla Dashboard — con più categorie insieme diventava una lista lunga che occupava buona parte dello schermo. Ora è una singola riga compatta ("2 categorie hanno superato il budget questo mese"), e il dettaglio per categoria (una piccola percentuale colorata) compare direttamente accanto al nome nella lista "Categorie principali" già presente in Dashboard.
+
 ## v1.24.2
 - **Tastierino numerico su tutti i campi importo** (nuova transazione, nuovo movimento risparmi, budget categoria, rettifica saldo, correzione entrate anno archiviato): aggiunto `inputMode="decimal"`, l'attributo corretto per chiedere al telefono il tastierino numerico invece della tastiera intera — più affidabile del solo `type="number"`, che su alcuni Android può comunque mostrare la tastiera completa.
 
